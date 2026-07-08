@@ -1,0 +1,280 @@
+import { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Scissors, Search } from 'lucide-react';
+import { supabase } from '../lib/supabase';
+import { Producto } from '../lib/types';
+import { numero } from '../utils/format';
+
+/* ============================================================
+   Modal de confirmación elegante (Eliminar, acciones críticas)
+   ============================================================ */
+export function ConfirmModal({
+  abierto, titulo, mensaje, onConfirmar, onCancelar, textoConfirmar = 'Eliminar',
+}: {
+  abierto: boolean;
+  titulo: string;
+  mensaje: string;
+  onConfirmar: () => void;
+  onCancelar: () => void;
+  textoConfirmar?: string;
+}) {
+  useEffect(() => {
+    if (!abierto) return;
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') onCancelar(); };
+    window.addEventListener('keydown', esc);
+    return () => window.removeEventListener('keydown', esc);
+  }, [abierto, onCancelar]);
+
+  if (!abierto) return null;
+  return (
+    <div className="fixed inset-0 z-[80] flex items-end md:items-center justify-center bg-pizarra-900/40 backdrop-blur-[2px] p-4 print:hidden" onClick={onCancelar}>
+      <div className="modal-enter dt-card w-full max-w-sm p-6" role="alertdialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-borgona-50 text-borgona-600">
+          <Scissors size={22} />
+        </div>
+        <h3 className="text-center text-[17px] font-bold text-pizarra-800">{titulo}</h3>
+        <p className="mt-2 text-center text-[14px] leading-relaxed text-pizarra-500">{mensaje}</p>
+        <div className="mt-6 grid grid-cols-2 gap-3">
+          <button className="dt-btn dt-btn-ghost" onClick={onCancelar} autoFocus>Cancelar</button>
+          <button className="dt-btn dt-btn-danger" onClick={onConfirmar}>{textoConfirmar}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   Buscador dinámico de productos con autocompletado
+   ============================================================ */
+export function BuscadorProducto({
+  onSeleccion, autoFocus, inputRef, placeholder = 'Buscar por nombre o código…',
+}: {
+  onSeleccion: (p: Producto) => void;
+  autoFocus?: boolean;
+  inputRef?: React.RefObject<HTMLInputElement>;
+  placeholder?: string;
+}) {
+  const [q, setQ] = useState('');
+  const [resultados, setResultados] = useState<Producto[]>([]);
+  const [abierto, setAbierto] = useState(false);
+  const [cursor, setCursor] = useState(-1);
+  const localRef = useRef<HTMLInputElement>(null);
+  const ref = inputRef ?? localRef;
+  const timer = useRef<ReturnType<typeof setTimeout>>();
+
+  useEffect(() => {
+    clearTimeout(timer.current);
+    if (q.trim().length < 2) { setResultados([]); setAbierto(false); return; }
+    timer.current = setTimeout(async () => {
+      // Envuelto en comillas dobles y escapado: sin esto, un nombre con coma,
+      // paréntesis u otro carácter reservado de PostgREST (frecuente en
+      // descripciones textiles, ej. "DRI (Dril)") rompe la sintaxis del
+      // filtro .or() y la búsqueda devuelve "sin coincidencias" en silencio.
+      const termino = q.trim().replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+      const { data } = await supabase
+        .from('productos')
+        .select('*')
+        .or(`nombre.ilike."%${termino}%",codigo_barra.ilike."%${termino}%"`)
+        .eq('activo', true)
+        .limit(8);
+      setResultados((data as Producto[]) ?? []);
+      setAbierto(true);
+      setCursor(-1);
+    }, 220);
+    return () => clearTimeout(timer.current);
+  }, [q]);
+
+  const elegir = (p: Producto) => {
+    onSeleccion(p);
+    setQ('');
+    setAbierto(false);
+  };
+
+  return (
+    <div className="relative">
+      <Search size={17} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-pizarra-400" />
+      <input
+        ref={ref}
+        value={q}
+        autoFocus={autoFocus}
+        onChange={(e) => setQ(e.target.value)}
+        onKeyDown={(e) => {
+          if (!abierto || resultados.length === 0) return;
+          if (e.key === 'ArrowDown') { e.preventDefault(); setCursor((c) => Math.min(c + 1, resultados.length - 1)); }
+          if (e.key === 'ArrowUp') { e.preventDefault(); setCursor((c) => Math.max(c - 1, 0)); }
+          if (e.key === 'Enter' && cursor >= 0) { e.preventDefault(); elegir(resultados[cursor]); }
+          if (e.key === 'Escape') setAbierto(false);
+        }}
+        onBlur={() => setTimeout(() => setAbierto(false), 160)}
+        placeholder={placeholder}
+        className="dt-input pl-10"
+        aria-label="Buscar producto"
+      />
+      {abierto && (
+        <ul className="absolute z-30 mt-1.5 max-h-72 w-full overflow-auto rounded-xl border border-pizarra-200 bg-white shadow-sastre-lg">
+          {resultados.length === 0 && (
+            <li className="px-4 py-3 text-[14px] text-pizarra-400">Sin coincidencias</li>
+          )}
+          {resultados.map((p, i) => (
+            <li key={p.id_producto}>
+              <button
+                type="button"
+                onMouseDown={(e) => { e.preventDefault(); elegir(p); }}
+                className={`flex w-full flex-col gap-0.5 px-4 py-2.5 text-left transition ${i === cursor ? 'bg-indigo-600/10' : 'hover:bg-pizarra-50'}`}
+              >
+                <span className="font-mono text-[12px] text-indigo-600">{p.codigo_barra}</span>
+                <span className="text-[14px] font-medium text-pizarra-800">
+                  {p.nombre} · {p.color} · Talla {p.talla}
+                </span>
+                <span className="text-[12px] text-pizarra-400">Stock: {numero(p.stock_real)}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/* ============================================================
+   Tabla de datos con ordenamiento por cabecera y paginación
+   (en móvil se transforma en tarjetas apilables)
+   ============================================================ */
+export interface Columna<T> {
+  clave: keyof T & string;
+  titulo: string;
+  render?: (fila: T) => ReactNode;
+  numerica?: boolean;
+}
+
+export function DataTable<T extends Record<string, unknown>>({
+  columnas, filas, porPagina = 10, vacio = 'Sin registros',
+}: {
+  columnas: Columna<T>[];
+  filas: T[];
+  porPagina?: number;
+  vacio?: string;
+}) {
+  const [orden, setOrden] = useState<{ clave: string; asc: boolean } | null>(null);
+  const [pagina, setPagina] = useState(1);
+
+  const ordenadas = useMemo(() => {
+    if (!orden) return filas;
+    const copia = [...filas];
+    copia.sort((a, b) => {
+      const va = a[orden.clave]; const vb = b[orden.clave];
+      if (typeof va === 'number' && typeof vb === 'number') return orden.asc ? va - vb : vb - va;
+      return orden.asc
+        ? String(va ?? '').localeCompare(String(vb ?? ''), 'es')
+        : String(vb ?? '').localeCompare(String(va ?? ''), 'es');
+    });
+    return copia;
+  }, [filas, orden]);
+
+  const totalPaginas = Math.max(1, Math.ceil(ordenadas.length / porPagina));
+  const pagSegura = Math.min(pagina, totalPaginas);
+  const visibles = ordenadas.slice((pagSegura - 1) * porPagina, pagSegura * porPagina);
+
+  const clickOrden = (clave: string) =>
+    setOrden((o) => (o?.clave === clave ? { clave, asc: !o.asc } : { clave, asc: true }));
+
+  return (
+    <div>
+      {/* Desktop: tabla */}
+      <div className="hidden md:block overflow-x-auto">
+        <table className="w-full text-[14px]">
+          <thead>
+            <tr className="border-b border-pizarra-200 text-left">
+              {columnas.map((c) => (
+                <th key={c.clave} className={`py-2.5 px-3 font-semibold text-pizarra-500 text-[12.5px] uppercase tracking-wider ${c.numerica ? 'text-right' : ''}`}>
+                  <button className="inline-flex items-center gap-1 hover:text-pizarra-800 transition" onClick={() => clickOrden(c.clave)}>
+                    {c.titulo}
+                    {orden?.clave === c.clave && (orden.asc ? <ChevronUp size={13} /> : <ChevronDown size={13} />)}
+                  </button>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {visibles.length === 0 && (
+              <tr><td colSpan={columnas.length} className="py-10 text-center text-pizarra-400">{vacio}</td></tr>
+            )}
+            {visibles.map((f, i) => (
+              <tr key={i} className="border-b border-pizarra-100 hover:bg-pizarra-50/70 transition">
+                {columnas.map((c) => (
+                  <td key={c.clave} className={`py-2.5 px-3 ${c.numerica ? 'text-right font-mono tabular-nums' : ''}`}>
+                    {c.render ? c.render(f) : String(f[c.clave] ?? '—')}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Móvil: tarjetas informativas */}
+      <div className="md:hidden space-y-2.5">
+        {visibles.length === 0 && <p className="py-8 text-center text-pizarra-400 text-[14px]">{vacio}</p>}
+        {visibles.map((f, i) => (
+          <div key={i} className="dt-card p-4">
+            {columnas.map((c) => (
+              <div key={c.clave} className="flex items-start justify-between gap-3 py-1">
+                <span className="text-[12px] font-semibold uppercase tracking-wide text-pizarra-400">{c.titulo}</span>
+                <span className={`text-[13.5px] text-right ${c.numerica ? 'font-mono tabular-nums' : ''}`}>
+                  {c.render ? c.render(f) : String(f[c.clave] ?? '—')}
+                </span>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+
+      {totalPaginas > 1 && (
+        <div className="mt-4 flex items-center justify-between text-[13px] text-pizarra-500">
+          <span>{ordenadas.length} registros</span>
+          <div className="flex items-center gap-2">
+            <button className="dt-btn dt-btn-ghost !px-2.5 !py-1.5" disabled={pagSegura <= 1} onClick={() => setPagina(pagSegura - 1)} aria-label="Página anterior">
+              <ChevronLeft size={16} />
+            </button>
+            <span className="font-medium">{pagSegura} / {totalPaginas}</span>
+            <button className="dt-btn dt-btn-ghost !px-2.5 !py-1.5" disabled={pagSegura >= totalPaginas} onClick={() => setPagina(pagSegura + 1)} aria-label="Página siguiente">
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ============================================================
+   Tarjeta KPI
+   ============================================================ */
+export function KpiCard({ titulo, valor, sufijo, acento }: {
+  titulo: string;
+  valor: string;
+  sufijo?: string;
+  acento?: boolean;
+}) {
+  return (
+    <div className={`dt-card p-4 ${acento ? 'border-indigo-600/30 bg-indigo-600/[0.03]' : ''}`}>
+      <p className="text-[12px] font-semibold uppercase tracking-wider text-pizarra-400">{titulo}</p>
+      <p className={`mt-1.5 text-[22px] font-bold tabular-nums leading-tight ${acento ? 'text-indigo-600' : 'text-pizarra-800'}`}>
+        {valor}{sufijo && <span className="ml-1 text-[13px] font-medium text-pizarra-400">{sufijo}</span>}
+      </p>
+    </div>
+  );
+}
+
+/* Encabezado de página */
+export function PageHeader({ titulo, subtitulo, extra }: { titulo: string; subtitulo?: string; extra?: ReactNode }) {
+  return (
+    <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+      <div>
+        <h1 className="text-[24px] md:text-[28px] font-extrabold tracking-tight text-pizarra-800">{titulo}</h1>
+        {subtitulo && <p className="mt-1 text-[14px] text-pizarra-500">{subtitulo}</p>}
+        <div className="costura mt-3 w-24" />
+      </div>
+      {extra}
+    </div>
+  );
+}

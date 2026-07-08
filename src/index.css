@@ -1,0 +1,117 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --dt-ink: #1E293B;
+  --dt-accent: #4F46E5;
+}
+
+html { -webkit-tap-highlight-color: transparent; }
+body {
+  @apply bg-hilo text-pizarra-800 font-sans antialiased;
+  font-feature-settings: 'cv02', 'cv11';
+}
+
+/* ---- Firma visual: costura punteada (hilo de sastre) ---- */
+.costura {
+  background-image: linear-gradient(90deg, #CBD5E1 45%, transparent 45%);
+  background-size: 8px 1px;
+  background-repeat: repeat-x;
+  height: 1px;
+}
+.costura-vertical {
+  background-image: linear-gradient(180deg, #CBD5E1 45%, transparent 45%);
+  background-size: 1px 8px;
+  background-repeat: repeat-y;
+  width: 1px;
+}
+
+/* ---- Etiqueta de prenda (código textil) ---- */
+.etiqueta-prenda {
+  position: relative;
+  background: #fff;
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(15,23,42,.05), 0 12px 28px -14px rgba(30,41,59,.25);
+}
+.etiqueta-prenda::before {
+  content: '';
+  position: absolute;
+  top: 10px; left: 50%;
+  transform: translateX(-50%);
+  width: 34px; height: 8px;
+  border: 1.5px solid #CBD5E1;
+  border-radius: 99px;
+  background: #F8FAFC;
+}
+
+/* ---- Inputs ---- */
+.dt-input {
+  @apply w-full rounded-[10px] border border-pizarra-200 bg-white px-3.5 py-2.5 text-[15px] text-pizarra-800 placeholder-pizarra-400 outline-none transition;
+}
+.dt-input:hover { @apply border-pizarra-300; }
+.dt-input:focus { @apply border-indigo-600 ring-4 ring-indigo-600/10; }
+.dt-input:read-only, .dt-input:disabled { @apply bg-pizarra-100 text-pizarra-500 cursor-not-allowed; }
+.dt-label { @apply mb-1.5 block text-[13px] font-semibold tracking-wide text-pizarra-600; }
+
+.dt-btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-[10px] px-4 py-2.5 text-[14px] font-semibold transition select-none;
+}
+.dt-btn:active { transform: translateY(1px); }
+.dt-btn-primary { @apply bg-indigo-600 text-white hover:bg-indigo-700 focus:ring-4 focus:ring-indigo-600/20; }
+.dt-btn-ghost { @apply bg-white border border-pizarra-200 text-pizarra-700 hover:border-pizarra-300 hover:bg-pizarra-50; }
+.dt-btn-danger { @apply bg-borgona-600 text-white hover:bg-borgona-700 focus:ring-4 focus:ring-borgona-600/20; }
+.dt-btn:disabled { @apply opacity-50 cursor-not-allowed; }
+
+.dt-card { @apply bg-white rounded-xl border border-pizarra-200/80 shadow-sastre; }
+
+/* Scrollbar sobrio */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 99px; border: 2px solid #F6F5F2; }
+::-webkit-scrollbar-track { background: transparent; }
+
+@keyframes toast-in { from { opacity: 0; transform: translateY(10px) scale(.97); } to { opacity: 1; transform: none; } }
+.toast-enter { animation: toast-in .18s ease-out; }
+
+@keyframes modal-in { from { opacity: 0; transform: translateY(14px) scale(.98); } to { opacity: 1; transform: none; } }
+.modal-enter { animation: modal-in .16s ease-out; }
+
+@keyframes login-in { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+.login-in { animation: login-in .55s cubic-bezier(.16,1,.3,1) both; }
+.login-in-delay { animation-delay: .12s; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
+/* ============================================================
+   IMPRESIÓN TÉRMICA 80mm — Ticket POS "Diego Torres"
+   ============================================================ */
+.ticket-80 { display: none; }
+
+@media print {
+  @page { size: 80mm auto; margin: 0; }
+  html, body { width: 80mm; margin: 0 !important; padding: 0 !important; background: #fff; }
+  body * { visibility: hidden; }
+  .ticket-80, .ticket-80 * { visibility: visible; }
+  .ticket-80 {
+    display: block !important;
+    position: absolute; left: 0; top: 0;
+    width: 80mm;
+    padding: 4mm 4mm 12mm;             /* margen inferior para corte térmico */
+    font-family: 'JetBrains Mono', 'Courier New', monospace;
+    font-size: 10.5px;
+    line-height: 1.35;
+    color: #000;
+  }
+  .ticket-80 .t-center { text-align: center; }
+  .ticket-80 .t-bold { font-weight: 700; }
+  .ticket-80 .t-lg { font-size: 13px; }
+  .ticket-80 .t-sep { border-top: 1px dashed #000; margin: 5px 0; }
+  .ticket-80 table { width: 100%; border-collapse: collapse; }
+  .ticket-80 td { padding: 1px 0; vertical-align: top; }
+  .ticket-80 .t-right { text-align: right; }
+  /* Zona de corte: alimenta papel antes del comando de corte de la impresora */
+  .ticket-80 .t-cut { height: 8mm; }
+}
