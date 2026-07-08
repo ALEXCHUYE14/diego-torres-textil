@@ -64,6 +64,14 @@ body {
 .dt-btn-danger { @apply bg-borgona-600 text-white hover:bg-borgona-700 focus:ring-4 focus:ring-borgona-600/20; }
 .dt-btn:disabled { @apply opacity-50 cursor-not-allowed; }
 
+/* Objetivos táctiles más cómodos en móvil (sin afectar la densidad de escritorio).
+   Los botones compactos (paginación, íconos de fila) usan clases !important y
+   quedan fuera de esta regla porque !important tiene mayor prioridad. */
+@media (max-width: 767px) {
+  .dt-input { padding-top: 0.75rem; padding-bottom: 0.75rem; }
+  .dt-btn { padding-top: 0.75rem; padding-bottom: 0.75rem; }
+}
+
 .dt-card { @apply bg-white rounded-xl border border-pizarra-200/80 shadow-sastre; }
 
 /* Scrollbar sobrio */

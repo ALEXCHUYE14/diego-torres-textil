@@ -34,8 +34,8 @@ export default function Login() {
 
   return (
     <div className="grid min-h-screen bg-hilo md:grid-cols-2">
-      {/* ================= Panel de marca (izquierda en escritorio) ================= */}
-      <div className="relative flex flex-col items-center justify-center overflow-hidden bg-pizarra-800 px-8 py-12 md:py-16">
+      {/* ================= Panel de marca (oculto en móvil: solo el login, sin imagen superior) ================= */}
+      <div className="relative hidden overflow-hidden bg-pizarra-800 px-8 py-12 md:flex md:flex-col md:items-center md:justify-center md:py-16">
         {/* Resplandor decorativo de fondo */}
         <div className="pointer-events-none absolute -left-24 -top-24 h-72 w-72 rounded-full bg-indigo-600/20 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-28 -right-16 h-80 w-80 rounded-full bg-borgona-600/10 blur-3xl" />
@@ -69,8 +69,8 @@ export default function Login() {
         </div>
       </div>
 
-      {/* ================= Panel de acceso (derecha en escritorio) ================= */}
-      <div className="flex items-center justify-center px-4 py-12 md:py-16">
+      {/* ================= Panel de acceso (pantalla completa en móvil, derecha en escritorio) ================= */}
+      <div className="flex min-h-screen items-center justify-center px-5 [padding-top:max(2.5rem,env(safe-area-inset-top))] [padding-bottom:max(2.5rem,env(safe-area-inset-bottom))] sm:px-6 md:min-h-0 md:px-4 md:[padding-top:4rem] md:[padding-bottom:4rem]">
         <div className="login-in login-in-delay w-full max-w-sm">
           <div className="mb-7 text-center md:text-left">
             <h2 className="text-[22px] font-extrabold tracking-tight text-pizarra-800">Ingresar al sistema</h2>
@@ -94,7 +94,7 @@ export default function Login() {
               <button
                 type="button"
                 onClick={() => setVerClave((v) => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-pizarra-400 transition hover:text-pizarra-700"
+                className="absolute right-1.5 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-lg text-pizarra-400 transition hover:bg-pizarra-100 hover:text-pizarra-700"
                 aria-label={verClave ? 'Ocultar contraseña' : 'Mostrar contraseña'}
                 tabIndex={-1}
               >

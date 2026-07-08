@@ -1,0 +1,16 @@
+{
+  "name": "Diego Torres · Inventario, POS y CRM Textil",
+  "short_name": "Diego Torres",
+  "description": "Sistema de inventario, punto de venta y CRM textil de Comercializadora T&E S.A.S.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#F6F5F2",
+  "theme_color": "#1E293B",
+  "icons": [
+    { "src": "/favicon-16x16.png", "sizes": "16x16", "type": "image/png" },
+    { "src": "/favicon-32x32.png", "sizes": "32x32", "type": "image/png" },
+    { "src": "/apple-touch-icon.png", "sizes": "180x180", "type": "image/png", "purpose": "any" }
+  ]
+}

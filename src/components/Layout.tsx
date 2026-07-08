@@ -86,7 +86,7 @@ export default function Layout({ children }: { children: ReactNode }) {
       </aside>
 
       {/* ================= Header móvil ================= */}
-      <header className="sticky top-0 z-40 flex items-center justify-between bg-pizarra-800 px-4 py-3 text-white md:hidden print:hidden">
+      <header className="sticky top-0 z-40 flex items-center justify-between bg-pizarra-800 px-4 pb-3 text-white md:hidden print:hidden [padding-top:max(0.75rem,env(safe-area-inset-top))]">
         <div className="flex items-center gap-2.5">
           <div className="grid h-8 w-8 place-items-center rounded-lg bg-hilo text-[13px] font-extrabold text-pizarra-800">DT</div>
           <span className="text-[15px] font-bold tracking-wide">Diego Torres</span>
