@@ -57,8 +57,12 @@ export default function Salidas() {
     toast('aviso', 'Se restauró un formulario de salida sin guardar');
   }, [uid, proveedores, toast]);
 
+  // Solo persiste si hay un producto elegido: guardar el formulario vacío
+  // por defecto hacía que cada visita a la página "restaurara" un borrador
+  // sin contenido real y mostrara el aviso de forma innecesaria.
   useEffect(() => {
     if (!uid) return;
+    if (!producto) { borrarBorrador(CLAVE_BORRADOR_SALIDA); return; }
     const b: BorradorSalida = {
       producto, tipoMov, proveedorId: proveedor?.id_proveedor ?? '', cantidad, concepto,
     };

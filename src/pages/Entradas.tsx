@@ -76,9 +76,13 @@ export default function Entradas() {
     toast('aviso', 'Se restauró un formulario de entrada sin guardar');
   }, [uid, proveedores, toast]);
 
-  // Persiste el formulario en cada cambio para sobrevivir a un F5 accidental
+  // Persiste el formulario en cada cambio para sobrevivir a un F5 accidental.
+  // Solo si hay un producto elegido: guardar el formulario vacío por defecto
+  // (como queda al entrar a la página) hacía que CADA visita "restaurara" un
+  // borrador sin contenido real y mostrara el aviso de forma innecesaria.
   useEffect(() => {
     if (!uid) return;
+    if (!producto) { borrarBorrador(CLAVE_BORRADOR_ENTRADA); return; }
     const b: BorradorEntrada = {
       producto, proveedorId: proveedor?.id_proveedor ?? '', tipoMov, fecha,
       cantidad, valor, nroFactura, nroOrden, concepto,
