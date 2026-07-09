@@ -228,8 +228,16 @@ export default function ImportadorEntradas({
     setProgreso({ hecho: 0, total: validas.length });
     const res: ResultadoFila[] = [];
 
-    // Catálogo de productos existentes, para no crear duplicados
-    const { data: prodData } = await supabase.from('productos').select('*').eq('activo', true);
+    // Catálogo de productos existentes, para no crear duplicados. Si esta
+    // consulta falla, abortamos: seguir con una lista vacía haría que el
+    // importador cree artículos duplicados para productos que ya existen.
+    const { data: prodData, error: errorProductos } = await supabase.from('productos').select('*').eq('activo', true);
+    if (errorProductos) {
+      toast('error', 'No se pudo leer el catálogo actual. Se canceló la importación para evitar artículos duplicados.');
+      setImportando(false);
+      setProgreso({ hecho: 0, total: 0 });
+      return;
+    }
     const productos = (prodData as Producto[]) ?? [];
     const productoPorClave = new Map<string, string>();
     for (const p of productos) {

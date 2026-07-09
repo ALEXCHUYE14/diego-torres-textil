@@ -25,23 +25,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [rol, setRol] = useState<Rol>('consulta');
   const [nombre, setNombre] = useState('');
-  const [cargando, setCargando] = useState(true);
+  const [cargandoSesion, setCargandoSesion] = useState(true);
+  const [perfilListo, setPerfilListo] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
-      setCargando(false);
+      setCargandoSesion(false);
     });
     const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
     return () => sub.subscription.unsubscribe();
   }, []);
 
   useEffect(() => {
-    if (!session) { setRol('consulta'); setNombre(''); return; }
+    if (!session) { setRol('consulta'); setNombre(''); setPerfilListo(true); return; }
     // Bandera de cancelación: si la sesión cambia (logout/login rápido de otro
     // usuario) antes de que esta consulta resuelva, se descarta su resultado
     // para no mezclar el rol/nombre de una sesión con datos de otra.
     let vigente = true;
+    setPerfilListo(false);
     (async () => {
       try {
         const { data, error } = await supabase
@@ -65,21 +67,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!vigente) return;
         toast('error', 'Error de red al verificar el rol del usuario.');
         setNombre(session.user.email ?? '');
+      } finally {
+        if (vigente) setPerfilListo(true);
       }
     })();
     return () => { vigente = false; };
-  }, [session, toast]);
+    // Depende del id de usuario (no del objeto `session` completo): Supabase
+    // entrega una referencia nueva de `session` en cada refresco automático
+    // de token aunque sea el mismo usuario, y sin esto se repetía la consulta
+    // de rol/nombre innecesariamente en cada refresco.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.user.id, toast]);
 
   const salir = async () => {
     try {
       await supabase.auth.signOut();
     } finally {
-      // Cierre de sesión controlado: se limpian los borradores locales para
-      // que el próximo usuario del equipo no herede carritos ni formularios
-      // a medio llenar de la sesión anterior.
       borrarTodosLosBorradores();
     }
   };
+
+  // La pantalla de carga cubre tanto la resolución de sesión como la del
+  // perfil (rol/nombre) en la carga inicial, para que el panel nunca se
+  // muestre por un instante con el rol equivocado. En refrescos posteriores
+  // de token (mismo usuario) `perfilListo` ya está en true y no vuelve a
+  // interrumpir al usuario con la pantalla de carga.
+  const cargando = cargandoSesion || (!!session && !perfilListo);
 
   return (
     <Ctx.Provider value={{ session, rol, nombre, cargando, esOperativo: rol === 'operativo', salir }}>

@@ -187,6 +187,14 @@ export function DataTable<T extends Record<string, unknown>>({
     if (resaltarId) setPagina(1);
   }, [resaltarId]);
 
+  // Si la cantidad de filas se reduce (ej. se elimina un registro) y la
+  // página actual queda fuera de rango, la corrige. Sin esto, el número de
+  // página quedaba "atascado" en un valor viejo que podía volver a
+  // manifestarse de forma inconsistente si la lista crecía de nuevo.
+  useEffect(() => {
+    setPagina((p) => (p > totalPaginas ? totalPaginas : p));
+  }, [totalPaginas]);
+
   return (
     <div>
       {/* Desktop: tabla */}
