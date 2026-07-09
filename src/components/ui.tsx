@@ -91,7 +91,7 @@ export function BuscadorProducto({
 
   return (
     <div className="relative">
-      <Search size={16} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-pizarra-400" />
+      <Search size={16} className="pointer-events-none absolute left-4 top-1/2 z-10 -translate-y-1/2 text-pizarra-400" />
       <input
         ref={ref}
         value={q}
@@ -106,7 +106,7 @@ export function BuscadorProducto({
         }}
         onBlur={() => setTimeout(() => setAbierto(false), 160)}
         placeholder={placeholder}
-        className="dt-input pl-11"
+        className="dt-input !pl-11"
         aria-label="Buscar producto"
       />
       {abierto && (

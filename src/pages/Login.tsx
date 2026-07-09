@@ -99,7 +99,7 @@ export default function Login() {
             <div className="relative">
               <input
                 id="clave" type={verClave ? 'text' : 'password'} required
-                className="dt-input pr-11" value={clave}
+                className="dt-input !pr-11" value={clave}
                 onChange={(e) => setClave(e.target.value)} placeholder="••••••••"
                 autoComplete="current-password"
               />
