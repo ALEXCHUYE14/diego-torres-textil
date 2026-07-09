@@ -113,7 +113,7 @@ export default function Login() {
           </form>
 
           <p className="mt-5 text-center text-[12px] text-pizarra-500 md:text-left">
-            Acceso restringido · Roles Consulta y Operativo
+            Acceso restringido · Roles Consulta y Administrador
           </p>
 
           <a

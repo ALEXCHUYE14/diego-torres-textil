@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { BuscadorProducto, PageHeader } from '../components/ui';
+import ImportadorEntradas from '../components/ImportadorEntradas';
 import { Producto, Proveedor, TIPOS_ENTRADA } from '../lib/types';
 import { hoyISO, limitesMesActual, moneda, numero } from '../utils/format';
 import { borrarBorrador, CLAVE_BORRADOR_ENTRADA, guardarBorrador, leerBorrador } from '../utils/borrador';
@@ -130,6 +131,7 @@ export default function Entradas() {
       <PageHeader
         titulo="Entradas de almacén"
         subtitulo="Abastecimiento · el consecutivo ENT se genera automáticamente al guardar"
+        extra={<ImportadorEntradas deshabilitado={!esOperativo} />}
       />
 
       <form onSubmit={guardar} className="dt-card p-5 md:p-7">

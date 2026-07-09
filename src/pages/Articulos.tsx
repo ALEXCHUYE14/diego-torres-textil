@@ -4,7 +4,6 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { ConfirmModal, DataTable, PageHeader } from '../components/ui';
-import ImportadorArticulos from '../components/ImportadorArticulos';
 import { Familia, GENEROS, Producto, TALLAS } from '../lib/types';
 import { moneda, numero } from '../utils/format';
 
@@ -139,7 +138,6 @@ export default function Articulos() {
       <PageHeader
         titulo="Codificación de artículos"
         subtitulo="El código se compone en vivo: Familia · Consecutivo · Nombre · Género · Color · Talla"
-        extra={<ImportadorArticulos familias={familias} deshabilitado={!esOperativo} onCompletado={cargar} />}
       />
 
       <div className="grid gap-6 lg:grid-cols-[1fr_340px]">

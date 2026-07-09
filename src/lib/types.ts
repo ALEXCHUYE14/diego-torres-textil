@@ -4,6 +4,14 @@
 
 export type Rol = 'consulta' | 'operativo';
 
+/**
+ * Etiqueta visible del rol. El valor de base de datos sigue siendo
+ * 'operativo' (así lo esperan las políticas RLS y los RPC en Supabase);
+ * "Administrador" es solo la forma en que se muestra en la interfaz,
+ * porque ese rol ya tiene permiso sobre todas las funciones del sistema.
+ */
+export const etiquetaRol = (r: Rol): string => (r === 'operativo' ? 'Administrador' : 'Consulta');
+
 export interface Familia {
   id_familia: string;
   codigo: string;

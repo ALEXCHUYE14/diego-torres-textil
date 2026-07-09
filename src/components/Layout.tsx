@@ -5,6 +5,7 @@ import {
   PanelLeftClose, PanelLeftOpen, Printer, ScanBarcode, Search,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { etiquetaRol } from '../lib/types';
 import PrintModal from './PrintModal';
 
 const NAV = [
@@ -69,7 +70,7 @@ export default function Layout({ children }: { children: ReactNode }) {
           {!colapsado && (
             <div className="px-3 pb-1">
               <p className="truncate text-[13px] font-medium text-white">{nombre || 'Usuario'}</p>
-              <p className="text-[11px] uppercase tracking-wider text-indigo-400 font-semibold">{rol}</p>
+              <p className="text-[11px] uppercase tracking-wider text-indigo-400 font-semibold">{etiquetaRol(rol)}</p>
             </div>
           )}
           <button onClick={salir} className="flex w-full items-center gap-3 rounded-[10px] px-3 py-2 text-[13.5px] hover:bg-white/5 hover:text-white transition" title="Cerrar sesión">
