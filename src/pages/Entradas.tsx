@@ -1,53 +1,32 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowDownToLine, Eraser, Save } from 'lucide-react';
+import { ArrowDownToLine, Eraser, Printer, Save, Trash2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { BuscadorProducto, PageHeader } from '../components/ui';
-import ImportadorEntradas from '../components/ImportadorEntradas';
-import { Producto, Proveedor, TIPOS_ENTRADA } from '../lib/types';
-import { hoyISO, limitesMesActual, moneda, numero } from '../utils/format';
-import { borrarBorrador, CLAVE_BORRADOR_ENTRADA, guardarBorrador, leerBorrador } from '../utils/borrador';
+import DocumentoImpreso from '../components/DocumentoImpreso';
+import { DocumentoMovimiento, LineaMovimiento, Producto, Proveedor, TIPOS_ENTRADA } from '../lib/types';
+import { hoyISO, limitesFechaMovimiento, moneda, numero } from '../utils/format';
 
-interface BorradorEntrada {
-  producto: Producto | null;
-  proveedorId: string;
-  tipoMov: string;
-  fecha: string;
-  cantidad: string;
-  valor: string;
-  nroFactura: string;
-  nroOrden: string;
-  concepto: string;
-}
+const claveLocal = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
 export default function Entradas() {
   const { toast } = useToast();
-  const { esOperativo, session } = useAuth();
-  const uid = session?.user.id ?? '';
+  const { esOperativo } = useAuth();
   const buscadorRef = useRef<HTMLInputElement>(null);
-  const restaurado = useRef(false);
 
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
-  const [producto, setProducto] = useState<Producto | null>(null);
   const [proveedor, setProveedor] = useState<Proveedor | null>(null);
   const [tipoMov, setTipoMov] = useState('1000');
   const [fecha, setFecha] = useState(hoyISO());
-  const [cantidad, setCantidad] = useState('');
-  const [valor, setValor] = useState('');
   const [nroFactura, setNroFactura] = useState('');
   const [nroOrden, setNroOrden] = useState('');
   const [concepto, setConcepto] = useState('');
+  const [lineas, setLineas] = useState<LineaMovimiento[]>([]);
   const [guardando, setGuardando] = useState(false);
+  const [documentoGuardado, setDocumentoGuardado] = useState<DocumentoMovimiento | null>(null);
 
-  const limites = useMemo(limitesMesActual, []);
-
-  // Total calculado reactivamente (onChange, sin refrescar pantalla)
-  const total = useMemo(() => {
-    const c = parseFloat(cantidad) || 0;
-    const v = parseFloat(valor) || 0;
-    return c * v;
-  }, [cantidad, valor]);
+  const limites = useMemo(limitesFechaMovimiento, []);
 
   useEffect(() => {
     (async () => {
@@ -61,67 +40,66 @@ export default function Entradas() {
     })();
   }, [toast]);
 
-  // Restaura el borrador (si existe y pertenece al usuario actual) una sola
-  // vez que los proveedores ya cargaron, para poder resolver el id guardado.
-  useEffect(() => {
-    if (!uid || restaurado.current || proveedores.length === 0) return;
-    restaurado.current = true;
-    const b = leerBorrador<BorradorEntrada>(CLAVE_BORRADOR_ENTRADA, uid);
-    if (!b) return;
-    setProducto(b.producto);
-    setProveedor(proveedores.find((p) => p.id_proveedor === b.proveedorId) ?? null);
-    setTipoMov(b.tipoMov); setFecha(b.fecha);
-    setCantidad(b.cantidad); setValor(b.valor);
-    setNroFactura(b.nroFactura); setNroOrden(b.nroOrden); setConcepto(b.concepto);
-    toast('aviso', 'Se restauró un formulario de entrada sin guardar');
-  }, [uid, proveedores, toast]);
+  const agregarLinea = (p: Producto) => {
+    setLineas((ls) => [...ls, {
+      clave: claveLocal(), producto: p, cantidad: '',
+      valorUnitario: p.costo_promedio_ponderado ? String(p.costo_promedio_ponderado) : '',
+    }]);
+  };
+  const quitarLinea = (clave: string) => setLineas((ls) => ls.filter((l) => l.clave !== clave));
+  const actualizarLinea = (clave: string, campo: 'cantidad' | 'valorUnitario', valor: string) =>
+    setLineas((ls) => ls.map((l) => (l.clave === clave ? { ...l, [campo]: valor } : l)));
 
-  // Persiste el formulario en cada cambio para sobrevivir a un F5 accidental.
-  // Solo si hay un producto elegido: guardar el formulario vacío por defecto
-  // (como queda al entrar a la página) hacía que CADA visita "restaurara" un
-  // borrador sin contenido real y mostrara el aviso de forma innecesaria.
-  useEffect(() => {
-    if (!uid) return;
-    if (!producto) { borrarBorrador(CLAVE_BORRADOR_ENTRADA); return; }
-    const b: BorradorEntrada = {
-      producto, proveedorId: proveedor?.id_proveedor ?? '', tipoMov, fecha,
-      cantidad, valor, nroFactura, nroOrden, concepto,
-    };
-    guardarBorrador(CLAVE_BORRADOR_ENTRADA, uid, b);
-  }, [uid, producto, proveedor, tipoMov, fecha, cantidad, valor, nroFactura, nroOrden, concepto]);
+  const total = useMemo(
+    () => lineas.reduce((s, l) => s + (parseFloat(l.cantidad) || 0) * (parseFloat(l.valorUnitario) || 0), 0),
+    [lineas]
+  );
 
   const limpiar = () => {
-    setProducto(null); setProveedor(null); setTipoMov('1000');
-    setFecha(hoyISO()); setCantidad(''); setValor('');
-    setNroFactura(''); setNroOrden(''); setConcepto('');
-    borrarBorrador(CLAVE_BORRADOR_ENTRADA);
-    buscadorRef.current?.focus();                 // devolver el foco al primer input operativo
+    setProveedor(null); setTipoMov('1000'); setFecha(hoyISO());
+    setNroFactura(''); setNroOrden(''); setConcepto(''); setLineas([]);
+    buscadorRef.current?.focus();
   };
 
   const guardar = async (e: FormEvent) => {
     e.preventDefault();
-    if (!producto) { toast('aviso', 'Seleccione un producto con el buscador'); return; }
+    setDocumentoGuardado(null);
     if (!proveedor) { toast('aviso', 'Seleccione el proveedor'); return; }
-    const c = parseFloat(cantidad);
-    const v = parseFloat(valor);
-    if (!c || c <= 0) { toast('error', 'La cantidad debe ser mayor a 0'); return; }
-    if (isNaN(v) || v < 0) { toast('error', 'Ingrese un valor unitario válido'); return; }
+    if (lineas.length === 0) { toast('aviso', 'Agregue al menos un artículo a la entrada'); return; }
+    for (const l of lineas) {
+      const c = parseFloat(l.cantidad);
+      const v = parseFloat(l.valorUnitario);
+      if (!c || c <= 0) { toast('error', `Cantidad inválida en "${l.producto.nombre}"`); return; }
+      if (isNaN(v) || v < 0) { toast('error', `Valor unitario inválido en "${l.producto.nombre}"`); return; }
+    }
 
     setGuardando(true);
     try {
-      const { data, error } = await supabase.rpc('rpc_registrar_entrada', {
-        p_producto_id: producto.id_producto,
+      const { data, error } = await supabase.rpc('rpc_registrar_entrada_lote', {
+        p_fecha: fecha,
         p_tipo_movimiento: tipoMov,
-        p_cantidad: c,
-        p_valor_unitario: v,
         p_proveedor_id: proveedor.id_proveedor,
+        p_items: lineas.map((l) => ({
+          producto_id: l.producto.id_producto,
+          cantidad: parseFloat(l.cantidad),
+          valor_unitario: parseFloat(l.valorUnitario),
+        })),
         p_nro_factura: nroFactura || null,
         p_nro_orden: nroOrden || null,
         p_concepto: concepto || null,
-        p_fecha: fecha,
       });
-      if (error) { toast('error', error.message.replace(/^.*?:/, '').trim() || 'No se pudo registrar la entrada'); return; }
-      toast('exito', `Entrada guardada con éxito · ${data.consecutivo}`);
+      if (error) {
+        toast('error', error.message.replace(/^.*?:/, '').trim() || 'No se pudo registrar la entrada');
+        return;
+      }
+      toast('exito', `Entrada guardada con éxito · Documento ${data.documento}`);
+      try {
+        const { data: doc } = await supabase.rpc('rpc_obtener_documento', { p_tipo: 'ENTRADA_ALMACEN', p_numero: data.documento });
+        setDocumentoGuardado(doc as DocumentoMovimiento);
+      } catch {
+        // La entrada ya se guardó correctamente; solo falló traer el documento para imprimir de inmediato.
+        toast('aviso', 'La entrada se guardó, pero no se pudo cargar la vista de impresión. Búsquela desde Imprimir.');
+      }
       limpiar();
     } catch {
       toast('error', 'Error de red al registrar la entrada. Verifique su conexión e intente nuevamente.');
@@ -134,31 +112,13 @@ export default function Entradas() {
     <div>
       <PageHeader
         titulo="Entradas de almacén"
-        subtitulo="Abastecimiento · el consecutivo ENT se genera automáticamente al guardar"
-        extra={<ImportadorEntradas deshabilitado={!esOperativo} />}
+        subtitulo="Documento multilínea · el N° de documento se asigna automáticamente al guardar"
       />
 
-      <form onSubmit={guardar} className="dt-card p-5 md:p-7">
+      <form onSubmit={guardar} className="dt-card p-5 md:p-7 print:hidden">
         <div className="grid gap-5 md:grid-cols-2">
-          {/* Paso 1: Producto */}
-          <div className="md:col-span-2">
-            <label className="dt-label">1 · Producto</label>
-            <BuscadorProducto onSeleccion={setProducto} inputRef={buscadorRef} autoFocus />
-            {producto && (
-              <div className="mt-3 rounded-[10px] border border-indigo-600/25 bg-indigo-600/[0.04] px-4 py-3">
-                <p className="font-mono text-[12.5px] text-indigo-600">{producto.codigo_barra}</p>
-                <p className="text-[14px] font-semibold text-pizarra-800">
-                  {producto.nombre} · {producto.genero} · {producto.color} · Talla {producto.talla}
-                </p>
-                <p className="text-[12.5px] text-pizarra-500">
-                  Stock actual: <strong>{numero(producto.stock_real)}</strong> · CPP: {moneda(producto.costo_promedio_ponderado)}
-                </p>
-              </div>
-            )}
-          </div>
-
           <div>
-            <label className="dt-label" htmlFor="tipo-mov">2 · Tipo de movimiento</label>
+            <label className="dt-label" htmlFor="tipo-mov">Tipo de movimiento</label>
             <select id="tipo-mov" className="dt-input" value={tipoMov} onChange={(e) => setTipoMov(e.target.value)}>
               {TIPOS_ENTRADA.map((t) => (
                 <option key={t.codigo} value={t.codigo}>{t.codigo} — {t.nombre}</option>
@@ -167,7 +127,7 @@ export default function Entradas() {
           </div>
 
           <div>
-            <label className="dt-label" htmlFor="fecha">3 · Fecha (mes actual)</label>
+            <label className="dt-label" htmlFor="fecha">Fecha del movimiento</label>
             <input
               id="fecha" type="date" className="dt-input"
               min={limites.min} max={limites.max}
@@ -177,9 +137,8 @@ export default function Entradas() {
             />
           </div>
 
-          {/* Proveedor con autollenado readonly */}
           <div className="md:col-span-2">
-            <label className="dt-label" htmlFor="proveedor">4 · Proveedor</label>
+            <label className="dt-label" htmlFor="proveedor">Proveedor</label>
             <select
               id="proveedor" className="dt-input"
               value={proveedor?.id_proveedor ?? ''}
@@ -191,37 +150,6 @@ export default function Entradas() {
                 <option key={p.id_proveedor} value={p.id_proveedor}>{p.razon_social}</option>
               ))}
             </select>
-            <div className="mt-3 grid gap-3 sm:grid-cols-3">
-              <div>
-                <label className="dt-label">NIT / Documento</label>
-                <input className="dt-input font-mono" readOnly value={proveedor?.nit_documento ?? ''} placeholder="—" />
-              </div>
-              <div>
-                <label className="dt-label">Correo</label>
-                <input className="dt-input" readOnly value={proveedor?.correo ?? ''} placeholder="—" />
-              </div>
-              <div>
-                <label className="dt-label">Teléfono</label>
-                <input className="dt-input" readOnly value={proveedor?.telefono ?? ''} placeholder="—" />
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <label className="dt-label" htmlFor="cantidad">5 · Cantidad</label>
-            <input
-              id="cantidad" type="number" min="0.01" step="0.01" inputMode="decimal"
-              className="dt-input text-right font-mono" placeholder="0"
-              value={cantidad} onChange={(e) => setCantidad(e.target.value)} required
-            />
-          </div>
-          <div>
-            <label className="dt-label" htmlFor="valor">6 · Valor unitario (S/)</label>
-            <input
-              id="valor" type="number" min="0" step="0.01" inputMode="decimal"
-              className="dt-input text-right font-mono" placeholder="0.00"
-              value={valor} onChange={(e) => setValor(e.target.value)} required
-            />
           </div>
 
           <div>
@@ -239,11 +167,49 @@ export default function Entradas() {
           </div>
         </div>
 
-        {/* Total reactivo + acciones */}
+        <div className="costura my-6" />
+
+        <label className="dt-label">Agregar artículo a la entrada</label>
+        <BuscadorProducto onSeleccion={agregarLinea} inputRef={buscadorRef} autoFocus placeholder="Busque un artículo y presione Enter para agregarlo…" />
+
+        <div className="mt-4 space-y-2.5">
+          {lineas.length === 0 && (
+            <div className="grid place-items-center rounded-xl border border-dashed border-pizarra-300 py-10 text-center">
+              <p className="text-[13.5px] text-pizarra-400">Aún no agregó artículos a esta entrada.</p>
+            </div>
+          )}
+          {lineas.map((l) => (
+            <div key={l.clave} className="grid grid-cols-2 items-center gap-3 rounded-xl border border-pizarra-200 px-4 py-3 sm:grid-cols-[1fr_110px_140px_auto]">
+              <div className="col-span-2 min-w-0 sm:col-span-1">
+                <p className="truncate text-[14px] font-semibold text-pizarra-800">{l.producto.nombre}</p>
+                <p className="truncate text-[12px] text-pizarra-500">{[l.producto.color, l.producto.talla].filter(Boolean).join(' · ') || l.producto.codigo_barra}</p>
+              </div>
+              <input
+                type="number" min="0.01" step="0.01" inputMode="decimal" placeholder="Cantidad"
+                value={l.cantidad} onChange={(e) => actualizarLinea(l.clave, 'cantidad', e.target.value)}
+                className="dt-input text-right font-mono"
+              />
+              <input
+                type="number" min="0" step="0.01" inputMode="decimal" placeholder="Valor unit."
+                value={l.valorUnitario} onChange={(e) => actualizarLinea(l.clave, 'valorUnitario', e.target.value)}
+                className="dt-input text-right font-mono"
+              />
+              <button
+                type="button"
+                className="justify-self-end rounded-lg p-1.5 text-pizarra-300 transition hover:bg-borgona-50 hover:text-borgona-600"
+                onClick={() => quitarLinea(l.clave)}
+                aria-label={`Quitar ${l.producto.nombre}`}
+              >
+                <Trash2 size={16} />
+              </button>
+            </div>
+          ))}
+        </div>
+
         <div className="costura my-6" />
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-[12px] font-semibold uppercase tracking-wider text-pizarra-400">Total de la entrada</p>
+            <p className="text-[12px] font-semibold uppercase tracking-wider text-pizarra-400">Total de la entrada · {lineas.length} línea(s)</p>
             <p className="text-[28px] font-extrabold tabular-nums text-pizarra-800">{moneda(total)}</p>
           </div>
           <div className="flex gap-3">
@@ -262,6 +228,20 @@ export default function Entradas() {
           </p>
         )}
       </form>
+
+      {documentoGuardado && (
+        <div className="dt-card mt-6 flex flex-col items-start gap-3 border-emerald-200 bg-emerald-50 p-5 sm:flex-row sm:items-center sm:justify-between print:hidden">
+          <div>
+            <p className="text-[13px] font-semibold text-emerald-700">Entrada guardada con éxito</p>
+            <p className="text-[22px] font-extrabold text-emerald-800">Documento {documentoGuardado.documento_numero}</p>
+          </div>
+          <button type="button" className="dt-btn dt-btn-primary" onClick={() => window.print()}>
+            <Printer size={16} /> Imprimir
+          </button>
+        </div>
+      )}
+
+      {documentoGuardado && <DocumentoImpreso doc={documentoGuardado} />}
     </div>
   );
 }

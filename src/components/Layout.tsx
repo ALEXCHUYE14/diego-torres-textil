@@ -1,7 +1,7 @@
 import { ReactNode, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import {
-  ArrowDownToLine, ArrowUpFromLine, LayoutDashboard, LogOut,
+  ArrowDownToLine, ArrowUpFromLine, LayoutDashboard, LibraryBig, LogOut,
   PanelLeftClose, PanelLeftOpen, Printer, ScanBarcode, Search,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -13,6 +13,7 @@ const NAV = [
   { a: '/entradas', icono: ArrowDownToLine, texto: 'Entradas' },
   { a: '/salidas', icono: ArrowUpFromLine, texto: 'Salidas' },
   { a: '/articulos', icono: ScanBarcode, texto: 'Artículos' },
+  { a: '/catalogos', icono: LibraryBig, texto: 'Catálogos' },
   { a: '/kardex', icono: Search, texto: 'Kardex' },
 ];
 
@@ -110,7 +111,7 @@ export default function Layout({ children }: { children: ReactNode }) {
       </main>
 
       {/* ================= Bottom Navigation (móvil, estilo app nativa) ================= */}
-      <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-pizarra-200 bg-white/95 backdrop-blur pb-[env(safe-area-inset-bottom)] md:hidden print:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-6 border-t border-pizarra-200 bg-white/95 backdrop-blur pb-[env(safe-area-inset-bottom)] md:hidden print:hidden">
         {NAV.map(({ a, icono: Icono, texto }) => (
           <NavLink
             key={a}

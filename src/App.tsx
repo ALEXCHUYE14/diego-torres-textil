@@ -7,6 +7,7 @@ import Dashboard from './pages/Dashboard';
 import Entradas from './pages/Entradas';
 import Salidas from './pages/Salidas';
 import Articulos from './pages/Articulos';
+import Catalogos from './pages/Catalogos';
 import Kardex from './pages/Kardex';
 
 function Rutas() {
@@ -31,6 +32,7 @@ function Rutas() {
         <Route path="/entradas" element={<Entradas />} />
         <Route path="/salidas" element={<Salidas />} />
         <Route path="/articulos" element={<Articulos />} />
+        <Route path="/catalogos" element={<Catalogos />} />
         <Route path="/kardex" element={<Kardex />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

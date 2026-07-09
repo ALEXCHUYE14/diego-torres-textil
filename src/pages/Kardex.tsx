@@ -68,7 +68,8 @@ export default function Kardex() {
           <div className="dt-card mt-6 p-5 md:p-6">
             <p className="font-mono text-[13px] text-indigo-600">{detalle.producto.codigo_barra}</p>
             <h2 className="mt-1 text-[20px] font-bold text-pizarra-800">
-              {detalle.producto.nombre} · {detalle.producto.genero} · {detalle.producto.color} · Talla {detalle.producto.talla}
+              {[detalle.producto.nombre, detalle.producto.genero, detalle.producto.color, detalle.producto.talla && `Talla ${detalle.producto.talla}`]
+                .filter(Boolean).join(' · ')}
             </h2>
             <p className="mt-1 text-[13px] text-pizarra-500">Creado el {fechaSegura(detalle.producto.fecha_creacion)}</p>
           </div>

@@ -91,7 +91,7 @@ export function BuscadorProducto({
 
   return (
     <div className="relative">
-      <Search size={17} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-pizarra-400" />
+      <Search size={16} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-pizarra-400" />
       <input
         ref={ref}
         value={q}
@@ -106,7 +106,7 @@ export function BuscadorProducto({
         }}
         onBlur={() => setTimeout(() => setAbierto(false), 160)}
         placeholder={placeholder}
-        className="dt-input pl-10"
+        className="dt-input pl-11"
         aria-label="Buscar producto"
       />
       {abierto && (
@@ -123,7 +123,7 @@ export function BuscadorProducto({
               >
                 <span className="font-mono text-[12px] text-indigo-600">{p.codigo_barra}</span>
                 <span className="text-[14px] font-medium text-pizarra-800">
-                  {p.nombre} · {p.color} · Talla {p.talla}
+                  {[p.nombre, p.color, p.talla && `Talla ${p.talla}`].filter(Boolean).join(' · ')}
                 </span>
                 <span className="text-[12px] text-pizarra-400">Stock: {numero(p.stock_real)}</span>
               </button>

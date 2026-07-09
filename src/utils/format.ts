@@ -1,12 +1,13 @@
-// Utilidades de formato · moneda PEN, fechas y números
+// Utilidades de formato · moneda COP, fechas y números
 
-const fmtMoneda = new Intl.NumberFormat('es-PE', {
+const fmtMoneda = new Intl.NumberFormat('es-CO', {
   style: 'currency',
-  currency: 'PEN',
-  minimumFractionDigits: 2,
+  currency: 'COP',
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 0,
 });
 
-const fmtNumero = new Intl.NumberFormat('es-PE', { maximumFractionDigits: 2 });
+const fmtNumero = new Intl.NumberFormat('es-CO', { maximumFractionDigits: 2 });
 
 export const moneda = (n: number | null | undefined): string =>
   fmtMoneda.format(Number(n ?? 0));
@@ -19,7 +20,7 @@ export const fechaSegura = (iso: string | null | undefined): string => {
   if (!iso) return '—';
   const d = new Date(iso);
   if (isNaN(d.getTime()) || d.getFullYear() < 1990) return '—';
-  return d.toLocaleDateString('es-PE', {
+  return d.toLocaleDateString('es-CO', {
     day: '2-digit', month: '2-digit', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
   });
@@ -29,20 +30,7 @@ export const soloFecha = (iso: string | null | undefined): string => {
   if (!iso) return '—';
   const d = new Date(iso);
   if (isNaN(d.getTime()) || d.getFullYear() < 1990) return '—';
-  return d.toLocaleDateString('es-PE');
-};
-
-/** Límites (min/max) del mes actual del servidor para inputs type=date */
-export const limitesMesActual = (): { min: string; max: string } => {
-  const hoy = new Date();
-  const y = hoy.getFullYear();
-  const m = hoy.getMonth();
-  const pad = (n: number) => String(n).padStart(2, '0');
-  const ultimo = new Date(y, m + 1, 0).getDate();
-  return {
-    min: `${y}-${pad(m + 1)}-01`,
-    max: `${y}-${pad(m + 1)}-${pad(ultimo)}`,
-  };
+  return d.toLocaleDateString('es-CO');
 };
 
 export const hoyISO = (): string => {
@@ -50,3 +38,13 @@ export const hoyISO = (): string => {
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 };
+
+/** Fecha desde la que el sistema permite registrar movimientos (carga inicial de inventario) */
+export const FECHA_INICIO_OPERACION = '2026-03-01';
+
+/** Límites (min/max) permitidos para fechas de movimiento: desde el inicio de
+ *  operación del sistema hasta hoy (no se permiten fechas futuras). */
+export const limitesFechaMovimiento = (): { min: string; max: string } => ({
+  min: FECHA_INICIO_OPERACION,
+  max: hoyISO(),
+});

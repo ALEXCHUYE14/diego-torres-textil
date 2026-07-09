@@ -1,36 +1,30 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowUpFromLine, Eraser, Save, TriangleAlert } from 'lucide-react';
+import { ArrowUpFromLine, Eraser, Printer, Save, Trash2, TriangleAlert } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { BuscadorProducto, PageHeader } from '../components/ui';
-import { Producto, Proveedor, TIPOS_SALIDA } from '../lib/types';
-import { moneda, numero } from '../utils/format';
-import { borrarBorrador, CLAVE_BORRADOR_SALIDA, guardarBorrador, leerBorrador } from '../utils/borrador';
+import DocumentoImpreso from '../components/DocumentoImpreso';
+import { DocumentoMovimiento, LineaMovimiento, Producto, Proveedor, TIPOS_SALIDA } from '../lib/types';
+import { hoyISO, limitesFechaMovimiento, moneda, numero } from '../utils/format';
 
-interface BorradorSalida {
-  producto: Producto | null;
-  tipoMov: string;
-  proveedorId: string;
-  cantidad: string;
-  concepto: string;
-}
+const claveLocal = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
 export default function Salidas() {
   const { toast } = useToast();
-  const { esOperativo, session } = useAuth();
-  const uid = session?.user.id ?? '';
+  const { esOperativo } = useAuth();
   const buscadorRef = useRef<HTMLInputElement>(null);
-  const avisado = useRef(false);
-  const restaurado = useRef(false);
 
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
-  const [producto, setProducto] = useState<Producto | null>(null);
-  const [tipoMov, setTipoMov] = useState('2000');
   const [proveedor, setProveedor] = useState<Proveedor | null>(null);
-  const [cantidad, setCantidad] = useState('');
+  const [tipoMov, setTipoMov] = useState('2000');
+  const [fecha, setFecha] = useState(hoyISO());
   const [concepto, setConcepto] = useState('');
+  const [lineas, setLineas] = useState<LineaMovimiento[]>([]);
   const [guardando, setGuardando] = useState(false);
+  const [documentoGuardado, setDocumentoGuardado] = useState<DocumentoMovimiento | null>(null);
+
+  const limites = useMemo(limitesFechaMovimiento, []);
 
   useEffect(() => {
     (async () => {
@@ -44,90 +38,67 @@ export default function Salidas() {
     })();
   }, [toast]);
 
-  // Restaura el borrador (si existe y pertenece al usuario actual) una vez
-  // que los proveedores ya cargaron, para poder resolver el id guardado.
-  useEffect(() => {
-    if (!uid || restaurado.current || proveedores.length === 0) return;
-    restaurado.current = true;
-    const b = leerBorrador<BorradorSalida>(CLAVE_BORRADOR_SALIDA, uid);
-    if (!b) return;
-    setProducto(b.producto); setTipoMov(b.tipoMov); setCantidad(b.cantidad);
-    setProveedor(proveedores.find((p) => p.id_proveedor === b.proveedorId) ?? null);
-    setConcepto(b.concepto);
-    toast('aviso', 'Se restauró un formulario de salida sin guardar');
-  }, [uid, proveedores, toast]);
-
-  // Solo persiste si hay un producto elegido: guardar el formulario vacío
-  // por defecto hacía que cada visita a la página "restaurara" un borrador
-  // sin contenido real y mostrara el aviso de forma innecesaria.
-  useEffect(() => {
-    if (!uid) return;
-    if (!producto) { borrarBorrador(CLAVE_BORRADOR_SALIDA); return; }
-    const b: BorradorSalida = {
-      producto, tipoMov, proveedorId: proveedor?.id_proveedor ?? '', cantidad, concepto,
-    };
-    guardarBorrador(CLAVE_BORRADOR_SALIDA, uid, b);
-  }, [uid, producto, tipoMov, proveedor, cantidad, concepto]);
-
-  const cantidadNum = parseFloat(cantidad) || 0;
-  const stockDisponible = producto?.stock_real ?? 0;
-  const excedeStock = producto !== null && cantidadNum > stockDisponible;
-
-  // Valor de solo lectura: costo promedio ponderado del inventario
-  const valorUnitario = producto?.costo_promedio_ponderado ?? 0;
-  const total = useMemo(() => cantidadNum * valorUnitario, [cantidadNum, valorUnitario]);
-
-  const cambiaCantidad = (v: string) => {
-    setCantidad(v);
-    const n = parseFloat(v) || 0;
-    // Validación crítica en tiempo real: alerta Toast roja al superar el stock
-    if (producto && n > producto.stock_real) {
-      if (!avisado.current) {
-        toast('error', `Stock insuficiente: disponible ${numero(producto.stock_real)} unidades`);
-        avisado.current = true;
-      }
-    } else {
-      avisado.current = false;
+  const agregarLinea = (p: Producto) => {
+    if (lineas.some((l) => l.producto.id_producto === p.id_producto)) {
+      toast('aviso', `"${p.nombre}" ya está en la lista de esta salida`);
+      return;
     }
+    setLineas((ls) => [...ls, { clave: claveLocal(), producto: p, cantidad: '', valorUnitario: String(p.costo_promedio_ponderado) }]);
   };
+  const quitarLinea = (clave: string) => setLineas((ls) => ls.filter((l) => l.clave !== clave));
+  const actualizarCantidad = (clave: string, valor: string) =>
+    setLineas((ls) => ls.map((l) => (l.clave === clave ? { ...l, cantidad: valor } : l)));
+
+  const excedeStock = (l: LineaMovimiento) => (parseFloat(l.cantidad) || 0) > l.producto.stock_real;
+  const algunaExcede = lineas.some(excedeStock);
+
+  const total = useMemo(
+    () => lineas.reduce((s, l) => s + (parseFloat(l.cantidad) || 0) * l.producto.costo_promedio_ponderado, 0),
+    [lineas]
+  );
 
   const limpiar = () => {
-    setProducto(null); setTipoMov('2000'); setProveedor(null); setCantidad('');
-    setConcepto('');
-    avisado.current = false;
-    borrarBorrador(CLAVE_BORRADOR_SALIDA);
+    setProveedor(null); setTipoMov('2000'); setFecha(hoyISO());
+    setConcepto(''); setLineas([]);
     buscadorRef.current?.focus();
   };
 
   const guardar = async (e: FormEvent) => {
     e.preventDefault();
-    if (!producto) { toast('aviso', 'Seleccione un producto'); return; }
-    if (cantidadNum <= 0) { toast('error', 'La cantidad debe ser mayor a 0'); return; }
-    if (excedeStock) {
-      toast('error', `Registro bloqueado: la cantidad supera el stock disponible (${numero(stockDisponible)})`);
-      return;
+    setDocumentoGuardado(null);
+    if (lineas.length === 0) { toast('aviso', 'Agregue al menos un artículo a la salida'); return; }
+    for (const l of lineas) {
+      const c = parseFloat(l.cantidad);
+      if (!c || c <= 0) { toast('error', `Cantidad inválida en "${l.producto.nombre}"`); return; }
     }
+    if (algunaExcede) { toast('error', 'Hay artículos cuya cantidad supera el stock disponible'); return; }
 
     setGuardando(true);
     try {
-      const { data, error } = await supabase.rpc('rpc_registrar_salida', {
-        p_producto_id: producto.id_producto,
+      const { data, error } = await supabase.rpc('rpc_registrar_salida_lote', {
+        p_fecha: fecha,
         p_tipo_movimiento: tipoMov,
-        p_cantidad: cantidadNum,
+        p_items: lineas.map((l) => ({ producto_id: l.producto.id_producto, cantidad: parseFloat(l.cantidad) })),
         p_proveedor_id: proveedor?.id_proveedor ?? null,
         p_concepto: concepto || null,
       });
       if (error) {
         let msg = error.message;
         if (msg.includes('STOCK_INSUFICIENTE')) {
-          msg = 'Stock insuficiente: otro usuario registró movimientos. Actualice el producto.';
+          msg = msg.replace(/^.*?:/, '').trim() || 'Stock insuficiente en uno de los artículos.';
         } else if (msg.includes('PERIODO_CERRADO')) {
           msg = msg.replace(/^.*?:/, '').trim();
         }
         toast('error', msg);
         return;
       }
-      toast('exito', `Salida guardada con éxito · ${data.consecutivo}`);
+      toast('exito', `Salida guardada con éxito · Documento ${data.documento}`);
+      try {
+        const { data: doc } = await supabase.rpc('rpc_obtener_documento', { p_tipo: 'SALIDA_ALMACEN', p_numero: data.documento });
+        setDocumentoGuardado(doc as DocumentoMovimiento);
+      } catch {
+        toast('aviso', 'La salida se guardó, pero no se pudo cargar la vista de impresión. Búsquela desde Imprimir.');
+      }
       limpiar();
     } catch {
       toast('error', 'Error de red al registrar la salida. Verifique su conexión e intente nuevamente.');
@@ -140,29 +111,13 @@ export default function Salidas() {
     <div>
       <PageHeader
         titulo="Salidas de almacén"
-        subtitulo="Despacho y ventas · el valor se calcula por costo promedio ponderado"
+        subtitulo="Documento multilínea · el valor se calcula por costo promedio ponderado"
       />
 
-      <form onSubmit={guardar} className="dt-card p-5 md:p-7">
+      <form onSubmit={guardar} className="dt-card p-5 md:p-7 print:hidden">
         <div className="grid gap-5 md:grid-cols-2">
-          <div className="md:col-span-2">
-            <label className="dt-label">1 · Producto</label>
-            <BuscadorProducto onSeleccion={(p) => { setProducto(p); avisado.current = false; }} inputRef={buscadorRef} autoFocus />
-            {producto && (
-              <div className={`mt-3 rounded-[10px] border px-4 py-3 transition ${excedeStock ? 'border-red-300 bg-red-50' : 'border-indigo-600/25 bg-indigo-600/[0.04]'}`}>
-                <p className="font-mono text-[12.5px] text-indigo-600">{producto.codigo_barra}</p>
-                <p className="text-[14px] font-semibold text-pizarra-800">
-                  {producto.nombre} · {producto.genero} · {producto.color} · Talla {producto.talla}
-                </p>
-                <p className={`text-[12.5px] ${excedeStock ? 'text-red-600 font-semibold' : 'text-pizarra-500'}`}>
-                  Stock disponible: <strong>{numero(producto.stock_real)}</strong>
-                </p>
-              </div>
-            )}
-          </div>
-
           <div>
-            <label className="dt-label" htmlFor="tipo-sal">2 · Tipo de movimiento</label>
+            <label className="dt-label" htmlFor="tipo-sal">Tipo de movimiento</label>
             <select id="tipo-sal" className="dt-input" value={tipoMov} onChange={(e) => setTipoMov(e.target.value)}>
               {TIPOS_SALIDA.map((t) => (
                 <option key={t.codigo} value={t.codigo}>{t.codigo} — {t.nombre}</option>
@@ -171,28 +126,18 @@ export default function Salidas() {
           </div>
 
           <div>
-            <label className="dt-label" htmlFor="cant-sal">3 · Cantidad</label>
+            <label className="dt-label" htmlFor="fecha-sal">Fecha del movimiento</label>
             <input
-              id="cant-sal" type="number" min="0.01" step="0.01" inputMode="decimal"
-              className={`dt-input text-right font-mono ${excedeStock ? '!border-red-400 !ring-4 !ring-red-500/10' : ''}`}
-              placeholder="0" value={cantidad}
-              onChange={(e) => cambiaCantidad(e.target.value)} required
-              aria-invalid={excedeStock}
+              id="fecha-sal" type="date" className="dt-input"
+              min={limites.min} max={limites.max}
+              value={fecha}
+              onChange={(e) => setFecha(e.target.value)}
+              required
             />
-            {excedeStock && (
-              <p className="mt-1.5 flex items-center gap-1.5 text-[12.5px] font-semibold text-red-600">
-                <TriangleAlert size={14} /> Supera el stock disponible · no se permiten stocks negativos
-              </p>
-            )}
-          </div>
-
-          <div>
-            <label className="dt-label" htmlFor="valor-sal">Valor unitario (CPP · solo lectura)</label>
-            <input id="valor-sal" className="dt-input text-right font-mono" readOnly value={producto ? moneda(valorUnitario) : ''} placeholder="—" />
           </div>
 
           <div className="md:col-span-2">
-            <label className="dt-label" htmlFor="proveedor-sal">Proveedor</label>
+            <label className="dt-label" htmlFor="proveedor-sal">Proveedor <span className="font-normal normal-case text-pizarra-400">(opcional)</span></label>
             <select
               id="proveedor-sal" className="dt-input"
               value={proveedor?.id_proveedor ?? ''}
@@ -212,16 +157,62 @@ export default function Salidas() {
         </div>
 
         <div className="costura my-6" />
+
+        <label className="dt-label">Agregar artículo a la salida</label>
+        <BuscadorProducto onSeleccion={agregarLinea} inputRef={buscadorRef} autoFocus placeholder="Busque un artículo y presione Enter para agregarlo…" />
+
+        <div className="mt-4 space-y-2.5">
+          {lineas.length === 0 && (
+            <div className="grid place-items-center rounded-xl border border-dashed border-pizarra-300 py-10 text-center">
+              <p className="text-[13.5px] text-pizarra-400">Aún no agregó artículos a esta salida.</p>
+            </div>
+          )}
+          {lineas.map((l) => {
+            const excede = excedeStock(l);
+            return (
+              <div key={l.clave} className={`grid grid-cols-2 items-center gap-3 rounded-xl border px-4 py-3 transition sm:grid-cols-[1fr_120px_130px_auto] ${excede ? 'border-red-300 bg-red-50' : 'border-pizarra-200'}`}>
+                <div className="col-span-2 min-w-0 sm:col-span-1">
+                  <p className="truncate text-[14px] font-semibold text-pizarra-800">{l.producto.nombre}</p>
+                  <p className={`truncate text-[12px] ${excede ? 'font-semibold text-red-600' : 'text-pizarra-500'}`}>
+                    Stock disponible: {numero(l.producto.stock_real)}
+                  </p>
+                </div>
+                <input
+                  type="number" min="0.01" step="0.01" inputMode="decimal" placeholder="Cantidad"
+                  value={l.cantidad} onChange={(e) => actualizarCantidad(l.clave, e.target.value)}
+                  className={`dt-input text-right font-mono ${excede ? '!border-red-400 !ring-4 !ring-red-500/10' : ''}`}
+                  aria-invalid={excede}
+                />
+                <input className="dt-input text-right font-mono" readOnly value={moneda(l.producto.costo_promedio_ponderado)} />
+                <button
+                  type="button"
+                  className="justify-self-end rounded-lg p-1.5 text-pizarra-300 transition hover:bg-borgona-50 hover:text-borgona-600"
+                  onClick={() => quitarLinea(l.clave)}
+                  aria-label={`Quitar ${l.producto.nombre}`}
+                >
+                  <Trash2 size={16} />
+                </button>
+                {excede && (
+                  <p className="col-span-2 flex items-center gap-1.5 text-[12px] font-semibold text-red-600 sm:col-span-4">
+                    <TriangleAlert size={13} /> Supera el stock disponible · no se permiten stocks negativos
+                  </p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="costura my-6" />
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-[12px] font-semibold uppercase tracking-wider text-pizarra-400">Total de la salida</p>
+            <p className="text-[12px] font-semibold uppercase tracking-wider text-pizarra-400">Total de la salida · {lineas.length} línea(s)</p>
             <p className="text-[28px] font-extrabold tabular-nums text-pizarra-800">{moneda(total)}</p>
           </div>
           <div className="flex gap-3">
             <button type="button" className="dt-btn dt-btn-ghost" onClick={limpiar}>
               <Eraser size={17} /> Limpiar
             </button>
-            <button type="submit" className="dt-btn dt-btn-primary" disabled={guardando || excedeStock || !esOperativo}>
+            <button type="submit" className="dt-btn dt-btn-primary" disabled={guardando || algunaExcede || !esOperativo}>
               {guardando ? <Save size={17} className="animate-pulse" /> : <ArrowUpFromLine size={17} />}
               {guardando ? 'Guardando…' : 'Guardar salida'}
             </button>
@@ -233,6 +224,20 @@ export default function Salidas() {
           </p>
         )}
       </form>
+
+      {documentoGuardado && (
+        <div className="dt-card mt-6 flex flex-col items-start gap-3 border-emerald-200 bg-emerald-50 p-5 sm:flex-row sm:items-center sm:justify-between print:hidden">
+          <div>
+            <p className="text-[13px] font-semibold text-emerald-700">Salida guardada con éxito</p>
+            <p className="text-[22px] font-extrabold text-emerald-800">Documento {documentoGuardado.documento_numero}</p>
+          </div>
+          <button type="button" className="dt-btn dt-btn-primary" onClick={() => window.print()}>
+            <Printer size={16} /> Imprimir
+          </button>
+        </div>
+      )}
+
+      {documentoGuardado && <DocumentoImpreso doc={documentoGuardado} />}
     </div>
   );
 }

@@ -94,32 +94,36 @@ body {
 }
 
 /* ============================================================
-   IMPRESIÓN TÉRMICA 80mm — Ticket POS "Diego Torres"
+   IMPRESIÓN · Documento de Entrada / Salida (formato A4)
+   Nota: se retiró el bloque de ticket térmico 80mm del POS (módulo sin
+   ruta activa) porque su `@page`/`html,body` no estaban condicionados a
+   la presencia de `.ticket-80` en el DOM — con ambos bloques presentes,
+   CUALQUIER impresión en el sistema (incluida esta) heredaba el tamaño
+   de página de 80mm y salía cortada. Solo puede haber un `@page` activo
+   por trabajo de impresión, así que se dejó únicamente el que se usa.
    ============================================================ */
-.ticket-80 { display: none; }
+.doc-impreso { display: none; }
 
 @media print {
-  @page { size: 80mm auto; margin: 0; }
-  html, body { width: 80mm; margin: 0 !important; padding: 0 !important; background: #fff; }
+  @page { size: letter portrait; margin: 14mm; }
+  html, body { background: #fff; }
   body * { visibility: hidden; }
-  .ticket-80, .ticket-80 * { visibility: visible; }
-  .ticket-80 {
+  .doc-impreso, .doc-impreso * { visibility: visible; }
+  .doc-impreso {
     display: block !important;
-    position: absolute; left: 0; top: 0;
-    width: 80mm;
-    padding: 4mm 4mm 12mm;             /* margen inferior para corte térmico */
-    font-family: 'JetBrains Mono', 'Courier New', monospace;
+    position: absolute; left: 0; top: 0; width: 100%;
+    font-family: Arial, Helvetica, sans-serif;
     font-size: 10.5px;
-    line-height: 1.35;
     color: #000;
   }
-  .ticket-80 .t-center { text-align: center; }
-  .ticket-80 .t-bold { font-weight: 700; }
-  .ticket-80 .t-lg { font-size: 13px; }
-  .ticket-80 .t-sep { border-top: 1px dashed #000; margin: 5px 0; }
-  .ticket-80 table { width: 100%; border-collapse: collapse; }
-  .ticket-80 td { padding: 1px 0; vertical-align: top; }
-  .ticket-80 .t-right { text-align: right; }
-  /* Zona de corte: alimenta papel antes del comando de corte de la impresora */
-  .ticket-80 .t-cut { height: 8mm; }
+  .di-encabezado { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+  .di-encabezado p { margin: 0; line-height: 1.5; }
+  .di-empresa { font-weight: 700; font-size: 13px; }
+  .di-numero { font-weight: 700; color: #b91c1c; white-space: nowrap; }
+  .di-tabla { width: 100%; border-collapse: collapse; margin-top: 6px; }
+  .di-tabla th, .di-tabla td { padding: 3px 5px; text-align: left; border-bottom: 1px solid #000; }
+  .di-tabla thead th { border-top: 2px solid #000; border-bottom: 2px solid #000; font-size: 10px; text-transform: uppercase; }
+  .di-num { text-align: right; }
+  .di-tabla tfoot td { border-top: 2px solid #000; border-bottom: none; font-weight: 700; }
+  .di-totales-label { text-align: right; }
 }

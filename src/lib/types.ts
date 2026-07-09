@@ -19,13 +19,31 @@ export interface Familia {
   consecutivo_familia: number;
 }
 
+export interface Genero {
+  id_genero: string;
+  nombre: string;
+  activo: boolean;
+}
+
+export interface Color {
+  id_color: string;
+  nombre: string;
+  activo: boolean;
+}
+
+export interface Talla {
+  id_talla: string;
+  nombre: string;
+  activo: boolean;
+}
+
 export interface Producto {
   id_producto: string;
   codigo_barra: string;
   nombre: string;
-  genero: string;
-  color: string;
-  talla: string;
+  genero: string | null;
+  color: string | null;
+  talla: string | null;
   id_familia: string;
   stock_real: number;
   costo_promedio_ponderado: number;
@@ -56,6 +74,7 @@ export interface Cliente {
 export interface Movimiento {
   id_movimiento: string;
   tipo_consecutivo: string;
+  documento_numero?: string;
   tipo_movimiento: string;
   naturaleza: 'ENTRADA' | 'SALIDA';
   fecha_registro: string;
@@ -123,6 +142,38 @@ export interface ItemCarrito {
   cantidad: number;
 }
 
+/** Una línea dentro del formulario maestro-detalle de Entradas/Salidas (aún sin guardar) */
+export interface LineaMovimiento {
+  clave: string; // id local para React (no es el id de la fila en base de datos)
+  producto: Producto;
+  cantidad: string;
+  valorUnitario: string; // solo aplica a Entradas; en Salidas se calcula por CPP
+}
+
+/** Documento impreso (Entrada o Salida) devuelto por rpc_obtener_documento */
+export interface DocumentoItem {
+  fecha_registro: string;
+  tipo_movimiento: string;
+  naturaleza: 'ENTRADA' | 'SALIDA';
+  producto_nombre: string;
+  proveedor_nombre: string | null;
+  cantidad: number;
+  valor_unitario: number;
+  valor_total: number;
+}
+
+export interface DocumentoMovimiento {
+  documento_numero: string;
+  fecha_registro: string;
+  tipo_movimiento: string;
+  naturaleza: 'ENTRADA' | 'SALIDA';
+  proveedor: Proveedor | null;
+  usuario_nombre: string | null;
+  items: DocumentoItem[];
+  total: number;
+  cantidad_total: number;
+}
+
 export const TIPOS_ENTRADA = [
   { codigo: '1000', nombre: 'Compra a proveedor' },
   { codigo: '1002', nombre: 'Devolución de cliente' },
@@ -134,6 +185,3 @@ export const TIPOS_SALIDA = [
   { codigo: '2000', nombre: 'Venta / Despacho' },
   { codigo: '2003', nombre: 'Salida a clientes' },
 ];
-
-export const GENEROS = ['HOMBRE', 'MUJER', 'UNISEX', 'NINO', 'NINA'];
-export const TALLAS = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'UNICA'];

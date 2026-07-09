@@ -4,7 +4,8 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { ConfirmModal, DataTable, PageHeader } from '../components/ui';
-import { Familia, GENEROS, Producto, TALLAS } from '../lib/types';
+import ImportadorCatalogo from '../components/ImportadorCatalogo';
+import { Color, Familia, Genero, Producto, Talla } from '../lib/types';
 import { moneda, numero } from '../utils/format';
 
 export default function Articulos() {
@@ -14,12 +15,15 @@ export default function Articulos() {
   const catalogoRef = useRef<HTMLDivElement>(null);
 
   const [familias, setFamilias] = useState<Familia[]>([]);
+  const [generos, setGeneros] = useState<Genero[]>([]);
+  const [colores, setColores] = useState<Color[]>([]);
+  const [tallas, setTallas] = useState<Talla[]>([]);
   const [productos, setProductos] = useState<Producto[]>([]);
   const [idFamilia, setIdFamilia] = useState('');
   const [nombre, setNombre] = useState('');
-  const [genero, setGenero] = useState('HOMBRE');
+  const [genero, setGenero] = useState('');
   const [color, setColor] = useState('');
-  const [talla, setTalla] = useState('M');
+  const [talla, setTalla] = useState('');
   const [editando, setEditando] = useState<Producto | null>(null);
   const [habilitado, setHabilitado] = useState(true);
   const [aEliminar, setAEliminar] = useState<Producto | null>(null);
@@ -28,29 +32,38 @@ export default function Articulos() {
 
   const familia = familias.find((f) => f.id_familia === idFamilia) ?? null;
 
-  // Composición dinámica en pantalla del código final
+  // Composición dinámica en pantalla del código final: genero/color/talla son
+  // opcionales, así que se omiten del código si el usuario los deja en blanco.
   const codigoPreview = useMemo(() => {
     const fam = familia ? familia.codigo : '·····';
     const cons = editando
       ? editando.codigo_barra.split('-')[1] ?? '···'
       : String((familia?.consecutivo_familia ?? 0) + 1).padStart(3, '0');
-    const partes = [
-      fam, cons,
-      nombre.trim() ? nombre.trim().toUpperCase() : 'NOMBRE',
-      genero, color.trim() ? color.trim().toUpperCase() : 'COLOR', talla,
-    ];
+    const partes = [fam, cons, nombre.trim() ? nombre.trim().toUpperCase() : 'NOMBRE'];
+    if (genero.trim()) partes.push(genero.trim().toUpperCase());
+    if (color.trim()) partes.push(color.trim().toUpperCase());
+    if (talla.trim()) partes.push(talla.trim().toUpperCase());
     return partes.join('-');
   }, [familia, nombre, genero, color, talla, editando]);
 
   const cargar = async () => {
     try {
-      const [{ data: f, error: e1 }, { data: p, error: e2 }] = await Promise.all([
+      const [
+        { data: f, error: e1 }, { data: p, error: e2 },
+        { data: g, error: e3 }, { data: c, error: e4 }, { data: t, error: e5 },
+      ] = await Promise.all([
         supabase.from('familias').select('*').order('codigo'),
         supabase.from('productos').select('*').eq('activo', true).order('fecha_creacion', { ascending: false }),
+        supabase.from('generos').select('*').order('nombre'),
+        supabase.from('colores').select('*').order('nombre'),
+        supabase.from('tallas').select('*').order('nombre'),
       ]);
-      if (e1 || e2) { toast('error', 'No se pudo cargar el catálogo de artículos'); return; }
+      if (e1 || e2 || e3 || e4 || e5) { toast('error', 'No se pudo cargar el catálogo de artículos'); return; }
       setFamilias((f as Familia[]) ?? []);
       setProductos((p as Producto[]) ?? []);
+      setGeneros((g as Genero[]) ?? []);
+      setColores((c as Color[]) ?? []);
+      setTallas((t as Talla[]) ?? []);
     } catch {
       toast('error', 'Error de red al cargar el catálogo. Verifique su conexión.');
     }
@@ -66,22 +79,21 @@ export default function Articulos() {
 
   const agregar = () => {
     setEditando(null); setHabilitado(true);
-    setIdFamilia(''); setNombre(''); setGenero('HOMBRE');
-    setColor(''); setTalla('M');
+    setIdFamilia(''); setNombre(''); setGenero(''); setColor(''); setTalla('');
     nombreRef.current?.focus();
   };
 
   const editar = (p: Producto) => {
     setEditando(p); setHabilitado(false);
-    setIdFamilia(p.id_familia); setNombre(p.nombre); setGenero(p.genero);
-    setColor(p.color); setTalla(p.talla);
+    setIdFamilia(p.id_familia); setNombre(p.nombre);
+    setGenero(p.genero ?? ''); setColor(p.color ?? ''); setTalla(p.talla ?? '');
     nombreRef.current?.focus();
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const guardar = async () => {
     if (!idFamilia) { toast('aviso', 'Seleccione la familia del artículo'); return; }
-    if (!nombre.trim() || !color.trim()) { toast('aviso', 'Nombre, género, color y talla son obligatorios'); return; }
+    if (!nombre.trim()) { toast('aviso', 'El nombre del artículo es obligatorio'); return; }
     setGuardando(true);
     try {
       if (editando) {
@@ -89,20 +101,32 @@ export default function Articulos() {
           .from('productos')
           .update({
             nombre: nombre.trim().toUpperCase(),
-            genero, color: color.trim().toUpperCase(), talla,
+            genero: genero.trim() ? genero.trim().toUpperCase() : null,
+            color: color.trim() ? color.trim().toUpperCase() : null,
+            talla: talla.trim() ? talla.trim().toUpperCase() : null,
           })
           .eq('id_producto', editando.id_producto);
-        if (error) { toast('error', error.message); return; }
+        if (error) {
+          toast('error', error.code === '23505'
+            ? 'Ya existe otro artículo activo con ese mismo nombre, género, color y talla en esta familia.'
+            : error.message);
+          return;
+        }
         toast('exito', 'Artículo actualizado con éxito');
         agregar();
         await cargar();
       } else {
         const { data, error } = await supabase.rpc('rpc_crear_articulo', {
           p_id_familia: idFamilia,
-          p_nombre: nombre, p_genero: genero, p_color: color, p_talla: talla,
+          p_nombre: nombre,
+          p_genero: genero.trim() || null,
+          p_color: color.trim() || null,
+          p_talla: talla.trim() || null,
         });
         if (error) { toast('error', error.message); return; }
-        toast('exito', `Artículo creado · ${data.codigo_barra}`);
+        toast(data.ya_existia ? 'aviso' : 'exito', data.ya_existia
+          ? `Ya existía un artículo idéntico · ${data.codigo_barra}`
+          : `Artículo creado · ${data.codigo_barra}`);
         agregar();
         await cargar();
         // UX: deja claro dónde quedó guardado — resalta la fila y hace scroll al catálogo
@@ -123,7 +147,12 @@ export default function Articulos() {
         .from('productos')
         .update({ activo: false })
         .eq('id_producto', aEliminar.id_producto);
-      if (error) { toast('error', error.message); return; }
+      if (error) {
+        // El trigger de base de datos bloquea la baja si el artículo ya tiene
+        // movimientos; su mensaje ya es claro y se muestra tal cual.
+        toast('error', error.message);
+        return;
+      }
       toast('exito', 'Código eliminado del catálogo');
       cargar();
     } catch {
@@ -137,7 +166,8 @@ export default function Articulos() {
     <div>
       <PageHeader
         titulo="Codificación de artículos"
-        subtitulo="El código se compone en vivo: Familia · Consecutivo · Nombre · Género · Color · Talla"
+        subtitulo="El código se compone en vivo: Familia · Consecutivo · Nombre · (Género · Color · Talla si aplican)"
+        extra={<ImportadorCatalogo familias={familias} deshabilitado={!esOperativo} onCompletado={cargar} />}
       />
 
       <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
@@ -145,7 +175,7 @@ export default function Articulos() {
         <div className="dt-card p-5 md:p-7">
           <div className="grid gap-5 sm:grid-cols-2">
             <div className="sm:col-span-2">
-              <label className="dt-label" htmlFor="familia">Familia</label>
+              <label className="dt-label" htmlFor="familia">Familia *</label>
               <select id="familia" className="dt-input" value={idFamilia} disabled={!habilitado || !!editando}
                 onChange={(e) => setIdFamilia(e.target.value)}>
                 <option value="" disabled>Seleccione la familia…</option>
@@ -154,29 +184,36 @@ export default function Articulos() {
                 ))}
               </select>
             </div>
-            <div>
+            <div className="sm:col-span-2">
               <label className="dt-label" htmlFor="art-nombre">Nombre *</label>
               <input id="art-nombre" ref={nombreRef} className="dt-input uppercase" disabled={!habilitado}
-                value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="BATA" />
+                value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="BATA · o EXTINTOR MARCA CHAFLUE" />
             </div>
             <div>
-              <label className="dt-label" htmlFor="art-genero">Género *</label>
+              <label className="dt-label" htmlFor="art-genero">Género <span className="font-normal normal-case text-pizarra-400">(opcional)</span></label>
               <select id="art-genero" className="dt-input" disabled={!habilitado} value={genero} onChange={(e) => setGenero(e.target.value)}>
-                {GENEROS.map((g) => <option key={g} value={g}>{g}</option>)}
+                <option value="">— No aplica —</option>
+                {generos.map((g) => <option key={g.id_genero} value={g.nombre}>{g.nombre}</option>)}
               </select>
             </div>
             <div>
-              <label className="dt-label" htmlFor="art-color">Color *</label>
-              <input id="art-color" className="dt-input uppercase" disabled={!habilitado}
-                value={color} onChange={(e) => setColor(e.target.value)} placeholder="DRI (Dril)" />
+              <label className="dt-label" htmlFor="art-color">Color <span className="font-normal normal-case text-pizarra-400">(opcional)</span></label>
+              <select id="art-color" className="dt-input" disabled={!habilitado} value={color} onChange={(e) => setColor(e.target.value)}>
+                <option value="">— No aplica —</option>
+                {colores.map((c) => <option key={c.id_color} value={c.nombre}>{c.nombre}</option>)}
+              </select>
             </div>
             <div>
-              <label className="dt-label" htmlFor="art-talla">Talla *</label>
+              <label className="dt-label" htmlFor="art-talla">Talla <span className="font-normal normal-case text-pizarra-400">(opcional)</span></label>
               <select id="art-talla" className="dt-input" disabled={!habilitado} value={talla} onChange={(e) => setTalla(e.target.value)}>
-                {TALLAS.map((t) => <option key={t} value={t}>{t}</option>)}
+                <option value="">— No aplica —</option>
+                {tallas.map((t) => <option key={t.id_talla} value={t.nombre}>{t.nombre}</option>)}
               </select>
             </div>
           </div>
+          <p className="mt-3 text-[12px] text-pizarra-400">
+            ¿Faltan opciones de género, color o talla? Adminístrelas desde <strong>Catálogos</strong>.
+          </p>
 
           {/* Panel de acciones estándar */}
           <div className="costura my-6" />
@@ -224,7 +261,7 @@ export default function Articulos() {
         <DataTable<Producto & Record<string, unknown>>
           columnas={[
             { clave: 'codigo_barra', titulo: 'Código', render: (p) => <span className="font-mono text-[12.5px] text-indigo-600">{p.codigo_barra}</span> },
-            { clave: 'nombre', titulo: 'Artículo', render: (p) => `${p.nombre} · ${p.color} · ${p.talla}` },
+            { clave: 'nombre', titulo: 'Artículo', render: (p) => [p.nombre, p.color, p.talla].filter(Boolean).join(' · ') },
             { clave: 'stock_real', titulo: 'Stock', numerica: true, render: (p) => numero(p.stock_real) },
             { clave: 'costo_promedio_ponderado', titulo: 'CPP', numerica: true, render: (p) => moneda(p.costo_promedio_ponderado) },
             { clave: 'id_producto', titulo: '', render: (p) => (
@@ -249,7 +286,7 @@ export default function Articulos() {
       <ConfirmModal
         abierto={aEliminar !== null}
         titulo="Eliminar código"
-        mensaje={`¿Está seguro de que desea eliminar este código? ${aEliminar?.codigo_barra ?? ''} saldrá del catálogo activo.`}
+        mensaje={`¿Está seguro de que desea eliminar este código? ${aEliminar?.codigo_barra ?? ''} saldrá del catálogo activo. Si ya tiene movimientos registrados, el sistema no lo permitirá.`}
         onConfirmar={eliminar}
         onCancelar={() => setAEliminar(null)}
       />
