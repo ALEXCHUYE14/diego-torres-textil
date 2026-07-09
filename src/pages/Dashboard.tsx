@@ -275,8 +275,8 @@ export default function Dashboard() {
                 <KpiCard titulo="Prom. entradas/día" valor={numero(informe.promedio_entradas)} />
                 <KpiCard titulo="Prom. salidas/día" valor={numero(informe.promedio_salidas)} />
                 <KpiCard titulo="Ocupación almacén" valor={`${informe.ocupacion_pct}%`} />
-                <KpiCard titulo="Valor inventario inicial" valor={moneda(informe.valor_inicial)} />
-                <KpiCard titulo="Valor inventario final" valor={moneda(informe.valor_final)} acento />
+                <KpiCard titulo="Valor inventario inicial" valor={moneda(informe.valor_inicial)} className="col-span-2 sm:col-span-1" />
+                <KpiCard titulo="Valor inventario final" valor={moneda(informe.valor_final)} acento className="col-span-2 sm:col-span-1" />
                 <div className="dt-card col-span-2 p-4 sm:col-span-1">
                   <p className="text-[12px] font-semibold uppercase tracking-wider text-pizarra-400">Producto top</p>
                   <p className="mt-1.5 text-[13px] font-semibold leading-snug text-pizarra-800">{informe.producto_top}</p>

@@ -270,16 +270,20 @@ export function DataTable<T extends Record<string, unknown>>({
 /* ============================================================
    Tarjeta KPI
    ============================================================ */
-export function KpiCard({ titulo, valor, sufijo, acento }: {
+export function KpiCard({ titulo, valor, sufijo, acento, className = '' }: {
   titulo: string;
   valor: string;
   sufijo?: string;
   acento?: boolean;
+  className?: string;
 }) {
   return (
-    <div className={`dt-card p-4 ${acento ? 'border-indigo-600/30 bg-indigo-600/[0.03]' : ''}`}>
-      <p className="text-[12px] font-semibold uppercase tracking-wider text-pizarra-400">{titulo}</p>
-      <p className={`mt-1.5 text-[22px] font-bold tabular-nums leading-tight ${acento ? 'text-indigo-600' : 'text-pizarra-800'}`}>
+    // min-w-0 es necesario porque esta tarjeta vive dentro de un grid: sin
+    // eso, un valor largo (ej. montos en soles con miles) no se encoge y
+    // se desborda fuera del marco en vez de ajustarse o partir línea.
+    <div className={`dt-card min-w-0 p-4 ${acento ? 'border-indigo-600/30 bg-indigo-600/[0.03]' : ''} ${className}`}>
+      <p className="truncate text-[12px] font-semibold uppercase tracking-wider text-pizarra-400">{titulo}</p>
+      <p className={`mt-1.5 break-words text-[18px] font-bold tabular-nums leading-tight sm:text-[22px] ${acento ? 'text-indigo-600' : 'text-pizarra-800'}`}>
         {valor}{sufijo && <span className="ml-1 text-[13px] font-medium text-pizarra-400">{sufijo}</span>}
       </p>
     </div>

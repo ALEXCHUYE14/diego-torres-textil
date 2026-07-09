@@ -78,6 +78,18 @@ export default function Login() {
           </div>
 
           <form onSubmit={entrar} className="dt-card p-6 shadow-sastre-lg">
+            {/* Logo dentro del marco: solo en móvil/tablet — en escritorio ya se ve
+                el logo grande del panel izquierdo, mostrar ambos sería redundante. */}
+            <div className="mb-5 flex justify-center md:hidden">
+              <div className="grid h-20 w-20 place-items-center rounded-full bg-white p-2.5 shadow-sastre ring-1 ring-pizarra-100">
+                <img
+                  src="/img/logo.png"
+                  alt="Comercializadora T&E S.A.S."
+                  className="h-full w-full object-contain"
+                />
+              </div>
+            </div>
+
             <label className="dt-label" htmlFor="correo">Correo</label>
             <input id="correo" type="email" required className="dt-input" value={correo}
               onChange={(e) => setCorreo(e.target.value)} placeholder="usuario@diegotorres.pe"
