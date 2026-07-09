@@ -2,7 +2,7 @@ import { ReactNode, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import {
   ArrowDownToLine, ArrowUpFromLine, LayoutDashboard, LogOut,
-  PanelLeftClose, PanelLeftOpen, Printer, ScanBarcode, Search, ShoppingBag,
+  PanelLeftClose, PanelLeftOpen, Printer, ScanBarcode, Search,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import PrintModal from './PrintModal';
@@ -12,7 +12,6 @@ const NAV = [
   { a: '/entradas', icono: ArrowDownToLine, texto: 'Entradas' },
   { a: '/salidas', icono: ArrowUpFromLine, texto: 'Salidas' },
   { a: '/articulos', icono: ScanBarcode, texto: 'Artículos' },
-  { a: '/pos', icono: ShoppingBag, texto: 'POS' },
   { a: '/kardex', icono: Search, texto: 'Kardex' },
 ];
 
@@ -28,11 +27,12 @@ export default function Layout({ children }: { children: ReactNode }) {
         className={`fixed inset-y-0 left-0 z-40 hidden md:flex flex-col bg-pizarra-800 text-pizarra-300 transition-[width] duration-200 print:hidden ${colapsado ? 'w-[68px]' : 'w-60'}`}
       >
         <div className="flex items-center gap-3 px-4 py-5">
-          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-hilo font-extrabold text-pizarra-800">DT</div>
+          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-white p-1 ring-1 ring-white/10">
+            <img src="/img/logo.png" alt="Comercializadora T&E S.A.S." className="h-full w-full object-contain" />
+          </div>
           {!colapsado && (
             <div className="leading-tight">
-              <p className="text-[15px] font-bold text-white tracking-wide">Diego Torres</p>
-              <p className="text-[11px] uppercase tracking-[0.18em] text-pizarra-400">Textil</p>
+              <p className="text-[15px] font-bold text-white tracking-wide">Comercializadora T&amp;E</p>
             </div>
           )}
         </div>
@@ -88,8 +88,10 @@ export default function Layout({ children }: { children: ReactNode }) {
       {/* ================= Header móvil ================= */}
       <header className="sticky top-0 z-40 flex items-center justify-between bg-pizarra-800 px-4 pb-3 text-white md:hidden print:hidden [padding-top:max(0.75rem,env(safe-area-inset-top))]">
         <div className="flex items-center gap-2.5">
-          <div className="grid h-8 w-8 place-items-center rounded-lg bg-hilo text-[13px] font-extrabold text-pizarra-800">DT</div>
-          <span className="text-[15px] font-bold tracking-wide">Diego Torres</span>
+          <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-white p-1 ring-1 ring-white/10">
+            <img src="/img/logo.png" alt="Comercializadora T&E S.A.S." className="h-full w-full object-contain" />
+          </div>
+          <span className="truncate text-[15px] font-bold tracking-wide">Comercializadora T&amp;E</span>
         </div>
         <div className="flex items-center gap-1">
           <button onClick={() => setPrintAbierto(true)} className="rounded-lg p-2 hover:bg-white/10 transition" aria-label="Imprimir documentos">
@@ -107,7 +109,7 @@ export default function Layout({ children }: { children: ReactNode }) {
       </main>
 
       {/* ================= Bottom Navigation (móvil, estilo app nativa) ================= */}
-      <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-6 border-t border-pizarra-200 bg-white/95 backdrop-blur pb-[env(safe-area-inset-bottom)] md:hidden print:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-pizarra-200 bg-white/95 backdrop-blur pb-[env(safe-area-inset-bottom)] md:hidden print:hidden">
         {NAV.map(({ a, icono: Icono, texto }) => (
           <NavLink
             key={a}

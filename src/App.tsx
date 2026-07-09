@@ -7,7 +7,6 @@ import Dashboard from './pages/Dashboard';
 import Entradas from './pages/Entradas';
 import Salidas from './pages/Salidas';
 import Articulos from './pages/Articulos';
-import POS from './pages/POS';
 import Kardex from './pages/Kardex';
 
 function Rutas() {
@@ -16,7 +15,9 @@ function Rutas() {
   if (cargando) {
     return (
       <div className="grid min-h-screen place-items-center bg-pizarra-800">
-        <div className="grid h-14 w-14 animate-pulse place-items-center rounded-2xl bg-hilo text-[20px] font-extrabold text-pizarra-800">DT</div>
+        <div className="grid h-14 w-14 animate-pulse place-items-center rounded-2xl bg-white p-2">
+          <img src="/img/logo.png" alt="Comercializadora T&E S.A.S." className="h-full w-full object-contain" />
+        </div>
       </div>
     );
   }
@@ -30,7 +31,6 @@ function Rutas() {
         <Route path="/entradas" element={<Entradas />} />
         <Route path="/salidas" element={<Salidas />} />
         <Route path="/articulos" element={<Articulos />} />
-        <Route path="/pos" element={<POS />} />
         <Route path="/kardex" element={<Kardex />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

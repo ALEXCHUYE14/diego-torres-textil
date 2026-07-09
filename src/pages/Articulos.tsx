@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { ConfirmModal, DataTable, PageHeader } from '../components/ui';
+import ImportadorArticulos from '../components/ImportadorArticulos';
 import { Familia, GENEROS, Producto, TALLAS } from '../lib/types';
 import { moneda, numero } from '../utils/format';
 
@@ -11,6 +12,7 @@ export default function Articulos() {
   const { toast } = useToast();
   const { esOperativo } = useAuth();
   const nombreRef = useRef<HTMLInputElement>(null);
+  const catalogoRef = useRef<HTMLDivElement>(null);
 
   const [familias, setFamilias] = useState<Familia[]>([]);
   const [productos, setProductos] = useState<Producto[]>([]);
@@ -19,12 +21,11 @@ export default function Articulos() {
   const [genero, setGenero] = useState('HOMBRE');
   const [color, setColor] = useState('');
   const [talla, setTalla] = useState('M');
-  const [valorInicial, setValorInicial] = useState('');
-  const [precioVenta, setPrecioVenta] = useState('');
   const [editando, setEditando] = useState<Producto | null>(null);
   const [habilitado, setHabilitado] = useState(true);
   const [aEliminar, setAEliminar] = useState<Producto | null>(null);
   const [guardando, setGuardando] = useState(false);
+  const [destacadoId, setDestacadoId] = useState<string | null>(null);
 
   const familia = familias.find((f) => f.id_familia === idFamilia) ?? null;
 
@@ -57,10 +58,17 @@ export default function Articulos() {
   };
   useEffect(() => { cargar(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // El resaltado del registro recién creado dura unos segundos y luego se apaga solo
+  useEffect(() => {
+    if (!destacadoId) return;
+    const t = setTimeout(() => setDestacadoId(null), 4000);
+    return () => clearTimeout(t);
+  }, [destacadoId]);
+
   const agregar = () => {
     setEditando(null); setHabilitado(true);
     setIdFamilia(''); setNombre(''); setGenero('HOMBRE');
-    setColor(''); setTalla('M'); setValorInicial(''); setPrecioVenta('');
+    setColor(''); setTalla('M');
     nombreRef.current?.focus();
   };
 
@@ -68,7 +76,6 @@ export default function Articulos() {
     setEditando(p); setHabilitado(false);
     setIdFamilia(p.id_familia); setNombre(p.nombre); setGenero(p.genero);
     setColor(p.color); setTalla(p.talla);
-    setValorInicial(String(p.valor_unitario_inicial)); setPrecioVenta(String(p.precio_venta));
     nombreRef.current?.focus();
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -84,24 +91,25 @@ export default function Articulos() {
           .update({
             nombre: nombre.trim().toUpperCase(),
             genero, color: color.trim().toUpperCase(), talla,
-            valor_unitario_inicial: parseFloat(valorInicial) || 0,
-            precio_venta: parseFloat(precioVenta) || 0,
           })
           .eq('id_producto', editando.id_producto);
         if (error) { toast('error', error.message); return; }
         toast('exito', 'Artículo actualizado con éxito');
+        agregar();
+        await cargar();
       } else {
         const { data, error } = await supabase.rpc('rpc_crear_articulo', {
           p_id_familia: idFamilia,
           p_nombre: nombre, p_genero: genero, p_color: color, p_talla: talla,
-          p_valor_inicial: parseFloat(valorInicial) || 0,
-          p_precio_venta: parseFloat(precioVenta) || 0,
         });
         if (error) { toast('error', error.message); return; }
         toast('exito', `Artículo creado · ${data.codigo_barra}`);
+        agregar();
+        await cargar();
+        // UX: deja claro dónde quedó guardado — resalta la fila y hace scroll al catálogo
+        setDestacadoId(data.id_producto as string);
+        catalogoRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
-      agregar();
-      cargar();
     } catch {
       toast('error', 'Error de red al guardar el artículo. Verifique su conexión.');
     } finally {
@@ -131,6 +139,7 @@ export default function Articulos() {
       <PageHeader
         titulo="Codificación de artículos"
         subtitulo="El código se compone en vivo: Familia · Consecutivo · Nombre · Género · Color · Talla"
+        extra={<ImportadorArticulos familias={familias} deshabilitado={!esOperativo} onCompletado={cargar} />}
       />
 
       <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
@@ -168,16 +177,6 @@ export default function Articulos() {
               <select id="art-talla" className="dt-input" disabled={!habilitado} value={talla} onChange={(e) => setTalla(e.target.value)}>
                 {TALLAS.map((t) => <option key={t} value={t}>{t}</option>)}
               </select>
-            </div>
-            <div>
-              <label className="dt-label" htmlFor="art-valor">Valor unitario inicial (S/)</label>
-              <input id="art-valor" type="number" min="0" step="0.01" className="dt-input text-right font-mono" disabled={!habilitado}
-                value={valorInicial} onChange={(e) => setValorInicial(e.target.value)} placeholder="0.00" />
-            </div>
-            <div>
-              <label className="dt-label" htmlFor="art-precio">Precio de venta (S/)</label>
-              <input id="art-precio" type="number" min="0" step="0.01" className="dt-input text-right font-mono" disabled={!habilitado}
-                value={precioVenta} onChange={(e) => setPrecioVenta(e.target.value)} placeholder="0.00" />
             </div>
           </div>
 
@@ -222,7 +221,7 @@ export default function Articulos() {
       </div>
 
       {/* ---------- Catálogo ---------- */}
-      <div className="dt-card mt-6 p-5 md:p-6">
+      <div ref={catalogoRef} className="dt-card mt-6 scroll-mt-6 p-5 md:p-6">
         <h2 className="mb-4 text-[16px] font-bold text-pizarra-800">Catálogo de artículos</h2>
         <DataTable<Producto & Record<string, unknown>>
           columnas={[
@@ -244,6 +243,8 @@ export default function Articulos() {
           filas={productos as Array<Producto & Record<string, unknown>>}
           porPagina={8}
           vacio="Aún no hay artículos codificados"
+          idDeFila={(p) => p.id_producto}
+          resaltarId={destacadoId}
         />
       </div>
 

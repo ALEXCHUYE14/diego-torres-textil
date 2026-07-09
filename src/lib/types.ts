@@ -62,6 +62,13 @@ export interface Movimiento {
   proveedor?: string | null;
 }
 
+export interface PeriodoBloqueado {
+  anio_mes: string;
+  bloqueado_por: string | null;
+  bloqueado_en: string;
+  nota: string | null;
+}
+
 export interface DetalleProducto {
   producto: Producto;
   stock_inicial: number;
@@ -117,7 +124,7 @@ export const TIPOS_ENTRADA = [
 
 export const TIPOS_SALIDA = [
   { codigo: '2000', nombre: 'Venta / Despacho' },
-  { codigo: '2003', nombre: 'Ajuste negativo de inventario' },
+  { codigo: '2003', nombre: 'Salida a clientes' },
 ];
 
 export const GENEROS = ['HOMBRE', 'MUJER', 'UNISEX', 'NINO', 'NINA'];

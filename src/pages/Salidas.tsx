@@ -4,16 +4,15 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { BuscadorProducto, PageHeader } from '../components/ui';
-import { Producto, TIPOS_SALIDA } from '../lib/types';
+import { Producto, Proveedor, TIPOS_SALIDA } from '../lib/types';
 import { moneda, numero } from '../utils/format';
 import { borrarBorrador, CLAVE_BORRADOR_SALIDA, guardarBorrador, leerBorrador } from '../utils/borrador';
 
 interface BorradorSalida {
   producto: Producto | null;
   tipoMov: string;
+  proveedorId: string;
   cantidad: string;
-  nroFactura: string;
-  nroOrden: string;
   concepto: string;
 }
 
@@ -25,29 +24,46 @@ export default function Salidas() {
   const avisado = useRef(false);
   const restaurado = useRef(false);
 
+  const [proveedores, setProveedores] = useState<Proveedor[]>([]);
   const [producto, setProducto] = useState<Producto | null>(null);
   const [tipoMov, setTipoMov] = useState('2000');
+  const [proveedor, setProveedor] = useState<Proveedor | null>(null);
   const [cantidad, setCantidad] = useState('');
-  const [nroFactura, setNroFactura] = useState('');
-  const [nroOrden, setNroOrden] = useState('');
   const [concepto, setConcepto] = useState('');
   const [guardando, setGuardando] = useState(false);
 
   useEffect(() => {
-    if (!uid || restaurado.current) return;
+    (async () => {
+      try {
+        const { data, error } = await supabase.from('terceros').select('*').order('razon_social');
+        if (error) { toast('error', 'No se pudo cargar la lista de proveedores'); return; }
+        setProveedores((data as Proveedor[]) ?? []);
+      } catch {
+        toast('error', 'Error de red al cargar proveedores. Verifique su conexión.');
+      }
+    })();
+  }, [toast]);
+
+  // Restaura el borrador (si existe y pertenece al usuario actual) una vez
+  // que los proveedores ya cargaron, para poder resolver el id guardado.
+  useEffect(() => {
+    if (!uid || restaurado.current || proveedores.length === 0) return;
     restaurado.current = true;
     const b = leerBorrador<BorradorSalida>(CLAVE_BORRADOR_SALIDA, uid);
     if (!b) return;
     setProducto(b.producto); setTipoMov(b.tipoMov); setCantidad(b.cantidad);
-    setNroFactura(b.nroFactura); setNroOrden(b.nroOrden); setConcepto(b.concepto);
+    setProveedor(proveedores.find((p) => p.id_proveedor === b.proveedorId) ?? null);
+    setConcepto(b.concepto);
     toast('aviso', 'Se restauró un formulario de salida sin guardar');
-  }, [uid, toast]);
+  }, [uid, proveedores, toast]);
 
   useEffect(() => {
     if (!uid) return;
-    const b: BorradorSalida = { producto, tipoMov, cantidad, nroFactura, nroOrden, concepto };
+    const b: BorradorSalida = {
+      producto, tipoMov, proveedorId: proveedor?.id_proveedor ?? '', cantidad, concepto,
+    };
     guardarBorrador(CLAVE_BORRADOR_SALIDA, uid, b);
-  }, [uid, producto, tipoMov, cantidad, nroFactura, nroOrden, concepto]);
+  }, [uid, producto, tipoMov, proveedor, cantidad, concepto]);
 
   const cantidadNum = parseFloat(cantidad) || 0;
   const stockDisponible = producto?.stock_real ?? 0;
@@ -72,8 +88,8 @@ export default function Salidas() {
   };
 
   const limpiar = () => {
-    setProducto(null); setTipoMov('2000'); setCantidad('');
-    setNroFactura(''); setNroOrden(''); setConcepto('');
+    setProducto(null); setTipoMov('2000'); setProveedor(null); setCantidad('');
+    setConcepto('');
     avisado.current = false;
     borrarBorrador(CLAVE_BORRADOR_SALIDA);
     buscadorRef.current?.focus();
@@ -94,14 +110,16 @@ export default function Salidas() {
         p_producto_id: producto.id_producto,
         p_tipo_movimiento: tipoMov,
         p_cantidad: cantidadNum,
-        p_nro_factura: nroFactura || null,
-        p_nro_orden: nroOrden || null,
+        p_proveedor_id: proveedor?.id_proveedor ?? null,
         p_concepto: concepto || null,
       });
       if (error) {
-        const msg = error.message.includes('STOCK_INSUFICIENTE')
-          ? 'Stock insuficiente: otro usuario registró movimientos. Actualice el producto.'
-          : error.message;
+        let msg = error.message;
+        if (msg.includes('STOCK_INSUFICIENTE')) {
+          msg = 'Stock insuficiente: otro usuario registró movimientos. Actualice el producto.';
+        } else if (msg.includes('PERIODO_CERRADO')) {
+          msg = msg.replace(/^.*?:/, '').trim();
+        }
         toast('error', msg);
         return;
       }
@@ -169,14 +187,20 @@ export default function Salidas() {
             <input id="valor-sal" className="dt-input text-right font-mono" readOnly value={producto ? moneda(valorUnitario) : ''} placeholder="—" />
           </div>
 
-          <div>
-            <label className="dt-label" htmlFor="fact-sal">N° Factura</label>
-            <input id="fact-sal" className="dt-input font-mono" value={nroFactura} onChange={(e) => setNroFactura(e.target.value)} placeholder="B001-000456" />
+          <div className="md:col-span-2">
+            <label className="dt-label" htmlFor="proveedor-sal">Proveedor</label>
+            <select
+              id="proveedor-sal" className="dt-input"
+              value={proveedor?.id_proveedor ?? ''}
+              onChange={(e) => setProveedor(proveedores.find((p) => p.id_proveedor === e.target.value) ?? null)}
+            >
+              <option value="">Sin proveedor asociado</option>
+              {proveedores.map((p) => (
+                <option key={p.id_proveedor} value={p.id_proveedor}>{p.razon_social}</option>
+              ))}
+            </select>
           </div>
-          <div>
-            <label className="dt-label" htmlFor="orden-sal">N° Orden</label>
-            <input id="orden-sal" className="dt-input font-mono" value={nroOrden} onChange={(e) => setNroOrden(e.target.value)} placeholder="PED-2026-102" />
-          </div>
+
           <div className="md:col-span-2">
             <label className="dt-label" htmlFor="conc-sal">Concepto</label>
             <input id="conc-sal" className="dt-input" value={concepto} onChange={(e) => setConcepto(e.target.value)} placeholder="Despacho a tienda…" />

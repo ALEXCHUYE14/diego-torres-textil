@@ -147,12 +147,16 @@ export interface Columna<T> {
 }
 
 export function DataTable<T extends Record<string, unknown>>({
-  columnas, filas, porPagina = 10, vacio = 'Sin registros',
+  columnas, filas, porPagina = 10, vacio = 'Sin registros', idDeFila, resaltarId,
 }: {
   columnas: Columna<T>[];
   filas: T[];
   porPagina?: number;
   vacio?: string;
+  /** Extrae un identificador único de cada fila (requerido para usar `resaltarId`). */
+  idDeFila?: (fila: T) => string;
+  /** Si el id de una fila visible coincide, se resalta brevemente (ej. registro recién creado). */
+  resaltarId?: string | null;
 }) {
   const [orden, setOrden] = useState<{ clave: string; asc: boolean } | null>(null);
   const [pagina, setPagina] = useState(1);
@@ -177,6 +181,12 @@ export function DataTable<T extends Record<string, unknown>>({
   const clickOrden = (clave: string) =>
     setOrden((o) => (o?.clave === clave ? { clave, asc: !o.asc } : { clave, asc: true }));
 
+  // Al aparecer un id a resaltar (ej. registro recién creado), vuelve a la
+  // página 1 para que quede a la vista sin que el usuario tenga que buscarlo.
+  useEffect(() => {
+    if (resaltarId) setPagina(1);
+  }, [resaltarId]);
+
   return (
     <div>
       {/* Desktop: tabla */}
@@ -198,15 +208,18 @@ export function DataTable<T extends Record<string, unknown>>({
             {visibles.length === 0 && (
               <tr><td colSpan={columnas.length} className="py-10 text-center text-pizarra-400">{vacio}</td></tr>
             )}
-            {visibles.map((f, i) => (
-              <tr key={i} className="border-b border-pizarra-100 hover:bg-pizarra-50/70 transition">
-                {columnas.map((c) => (
-                  <td key={c.clave} className={`py-2.5 px-3 ${c.numerica ? 'text-right font-mono tabular-nums' : ''}`}>
-                    {c.render ? c.render(f) : String(f[c.clave] ?? '—')}
-                  </td>
-                ))}
-              </tr>
-            ))}
+            {visibles.map((f, i) => {
+              const esNueva = !!resaltarId && idDeFila?.(f) === resaltarId;
+              return (
+                <tr key={i} className={`border-b border-pizarra-100 transition ${esNueva ? 'bg-indigo-600/[0.06] hover:bg-indigo-600/10' : 'hover:bg-pizarra-50/70'}`}>
+                  {columnas.map((c) => (
+                    <td key={c.clave} className={`py-2.5 px-3 ${c.numerica ? 'text-right font-mono tabular-nums' : ''}`}>
+                      {c.render ? c.render(f) : String(f[c.clave] ?? '—')}
+                    </td>
+                  ))}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -215,7 +228,7 @@ export function DataTable<T extends Record<string, unknown>>({
       <div className="md:hidden space-y-2.5">
         {visibles.length === 0 && <p className="py-8 text-center text-pizarra-400 text-[14px]">{vacio}</p>}
         {visibles.map((f, i) => (
-          <div key={i} className="dt-card p-4">
+          <div key={i} className={`dt-card p-4 transition ${resaltarId && idDeFila?.(f) === resaltarId ? 'border-indigo-600/40 bg-indigo-600/[0.04] ring-1 ring-indigo-600/20' : ''}`}>
             {columnas.map((c) => (
               <div key={c.clave} className="flex items-start justify-between gap-3 py-1">
                 <span className="text-[12px] font-semibold uppercase tracking-wide text-pizarra-400">{c.titulo}</span>

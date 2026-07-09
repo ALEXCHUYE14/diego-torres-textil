@@ -105,6 +105,7 @@ export default function Kardex() {
                 { clave: 'cantidad', titulo: 'Cantidad', numerica: true, render: (m) => numero(m.cantidad) },
                 { clave: 'valor_unitario', titulo: 'V. Unitario', numerica: true, render: (m) => moneda(m.valor_unitario) },
                 { clave: 'valor_total', titulo: 'V. Total', numerica: true, render: (m) => moneda(m.valor_total) },
+                { clave: 'proveedor', titulo: 'Proveedor', render: (m) => m.proveedor ?? '—' },
                 { clave: 'stock_resultante', titulo: 'Saldo', numerica: true, render: (m) => numero(m.stock_resultante) },
               ]}
               filas={movimientos as Array<Movimiento & Record<string, unknown>>}

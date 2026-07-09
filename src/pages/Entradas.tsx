@@ -223,7 +223,7 @@ export default function Entradas() {
             <input id="factura" className="dt-input font-mono" value={nroFactura} onChange={(e) => setNroFactura(e.target.value)} placeholder="F001-000123" />
           </div>
           <div>
-            <label className="dt-label" htmlFor="orden">N° Orden</label>
+            <label className="dt-label" htmlFor="orden">N° Orden Compra</label>
             <input id="orden" className="dt-input font-mono" value={nroOrden} onChange={(e) => setNroOrden(e.target.value)} placeholder="OC-2026-045" />
           </div>
 

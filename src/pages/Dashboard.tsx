@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Eraser, FileDown, RefreshCcw } from 'lucide-react';
+import { Eraser, FileDown, Lock, RefreshCcw, Unlock } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { DataTable, KpiCard, PageHeader } from '../components/ui';
-import { FilaInforme, InformeCierre } from '../lib/types';
+import { FilaInforme, InformeCierre, PeriodoBloqueado } from '../lib/types';
 import { hoyISO, moneda, numero } from '../utils/format';
 
 const inicioMes = (): string => {
@@ -13,12 +14,22 @@ const inicioMes = (): string => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
 };
 
+const etiquetaMes = (anioMes: string): string => {
+  const [y, m] = anioMes.slice(0, 7).split('-');
+  return `${m}/${y}`;
+};
+
 export default function Dashboard() {
   const { toast } = useToast();
+  const { esOperativo } = useAuth();
   const [desde, setDesde] = useState(inicioMes());
   const [hasta, setHasta] = useState(hoyISO());
   const [informe, setInforme] = useState<InformeCierre | null>(null);
   const [cargando, setCargando] = useState(false);
+
+  const [periodos, setPeriodos] = useState<PeriodoBloqueado[]>([]);
+  const [mesSeleccionado, setMesSeleccionado] = useState(() => hoyISO().slice(0, 7));
+  const [procesandoPeriodo, setProcesandoPeriodo] = useState(false);
 
   const actualizar = async (d = desde, h = hasta) => {
     if (!d || !h) { toast('aviso', 'Seleccione fecha de inicio y fin'); return; }
@@ -35,7 +46,54 @@ export default function Dashboard() {
     }
   };
 
-  useEffect(() => { actualizar(); /* carga inicial del mes en curso */ }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const cargarPeriodos = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('periodos_bloqueados')
+        .select('*')
+        .order('anio_mes', { ascending: false });
+      if (error) return; // silencioso: no bloquea la carga del informe si la tabla aún no existe
+      setPeriodos((data as PeriodoBloqueado[]) ?? []);
+    } catch {
+      // sin conexión: el resto del panel sigue funcionando
+    }
+  };
+
+  useEffect(() => {
+    actualizar(); // carga inicial del mes en curso
+    cargarPeriodos();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const estaBloqueado = (anioMes: string) => periodos.some((p) => p.anio_mes.slice(0, 7) === anioMes);
+
+  const cerrarPeriodo = async () => {
+    if (!mesSeleccionado) return;
+    setProcesandoPeriodo(true);
+    try {
+      const { error } = await supabase.rpc('rpc_bloquear_periodo', { p_anio_mes: `${mesSeleccionado}-01` });
+      if (error) { toast('error', error.message); return; }
+      toast('exito', `Período ${etiquetaMes(mesSeleccionado)} cerrado. No se podrán registrar movimientos en ese mes.`);
+      cargarPeriodos();
+    } catch {
+      toast('error', 'Error de red al cerrar el período. Verifique su conexión.');
+    } finally {
+      setProcesandoPeriodo(false);
+    }
+  };
+
+  const reabrirPeriodo = async (anioMes: string) => {
+    setProcesandoPeriodo(true);
+    try {
+      const { error } = await supabase.rpc('rpc_desbloquear_periodo', { p_anio_mes: anioMes });
+      if (error) { toast('error', error.message); return; }
+      toast('exito', `Período ${etiquetaMes(anioMes)} reabierto`);
+      cargarPeriodos();
+    } catch {
+      toast('error', 'Error de red al reabrir el período. Verifique su conexión.');
+    } finally {
+      setProcesandoPeriodo(false);
+    }
+  };
 
   const limpiarFechas = () => {
     const d = inicioMes(); const h = hoyISO();
@@ -100,6 +158,65 @@ export default function Dashboard() {
         subtitulo="Panel consolidado de inventario · reemplaza el cierre manual en Excel"
       />
 
+      {/* -------- Control de cierre / bloqueo de mes -------- */}
+      <div className="dt-card mb-6 p-4 md:p-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h3 className="flex items-center gap-2 text-[14px] font-bold text-pizarra-800">
+              <Lock size={15} className="text-borgona-600" /> Cierre de mes
+            </h3>
+            <p className="mt-1 text-[12.5px] text-pizarra-500">
+              Bloquea un período contable: mientras esté cerrado, no se podrán registrar entradas ni salidas con fecha dentro de ese mes.
+            </p>
+          </div>
+          <div className="flex items-end gap-2">
+            <div>
+              <label className="dt-label" htmlFor="mes-cierre">Mes</label>
+              <input
+                id="mes-cierre" type="month" className="dt-input !w-auto"
+                value={mesSeleccionado} onChange={(e) => setMesSeleccionado(e.target.value)}
+                disabled={!esOperativo}
+              />
+            </div>
+            <button
+              className="dt-btn dt-btn-danger"
+              disabled={!esOperativo || procesandoPeriodo || !mesSeleccionado || estaBloqueado(mesSeleccionado)}
+              onClick={cerrarPeriodo}
+            >
+              <Lock size={15} /> Cerrar mes
+            </button>
+          </div>
+        </div>
+
+        {periodos.length > 0 && (
+          <>
+            <div className="costura my-4" />
+            <p className="mb-2 text-[12px] font-semibold uppercase tracking-wider text-pizarra-400">Períodos cerrados</p>
+            <ul className="flex flex-wrap gap-2">
+              {periodos.map((p) => (
+                <li key={p.anio_mes} className="flex items-center gap-2 rounded-full border border-borgona-100 bg-borgona-50 px-3 py-1.5 text-[12.5px] font-medium text-borgona-600">
+                  <Lock size={12} /> {etiquetaMes(p.anio_mes)}
+                  {esOperativo && (
+                    <button
+                      type="button"
+                      onClick={() => reabrirPeriodo(p.anio_mes)}
+                      disabled={procesandoPeriodo}
+                      className="rounded-full p-0.5 transition hover:bg-borgona-100 hover:text-borgona-800"
+                      aria-label={`Reabrir período ${etiquetaMes(p.anio_mes)}`}
+                    >
+                      <Unlock size={12} />
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+        {!esOperativo && (
+          <p className="mt-3 text-[12.5px] text-pizarra-400">Su rol es Consulta: puede ver el estado de los períodos, pero no cerrarlos ni reabrirlos.</p>
+        )}
+      </div>
+
       {/* -------- Filtros globales -------- */}
       <div className="dt-card p-4 md:p-5">
         <div className="flex flex-col gap-3 md:flex-row md:items-end">
@@ -111,15 +228,25 @@ export default function Dashboard() {
             <label className="dt-label" htmlFor="f-hasta">Fecha fin</label>
             <input id="f-hasta" type="date" className="dt-input" value={hasta} onChange={(e) => setHasta(e.target.value)} />
           </div>
-          <div className="flex gap-2.5">
-            <button className="dt-btn dt-btn-primary" onClick={() => actualizar()} disabled={cargando}>
-              <RefreshCcw size={16} className={cargando ? 'animate-spin' : ''} /> Actualizar datos
+          <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap sm:gap-2.5">
+            <button
+              className="dt-btn dt-btn-primary !px-2 !py-2 !text-[12px] sm:!px-4 sm:!py-2.5 sm:!text-[14px]"
+              onClick={() => actualizar()} disabled={cargando}
+            >
+              <RefreshCcw size={15} className={`shrink-0 ${cargando ? 'animate-spin' : ''}`} />
+              <span className="truncate">Actualizar</span>
             </button>
-            <button className="dt-btn dt-btn-ghost" onClick={limpiarFechas}>
-              <Eraser size={16} /> Limpiar fechas
+            <button
+              className="dt-btn dt-btn-ghost !px-2 !py-2 !text-[12px] sm:!px-4 sm:!py-2.5 sm:!text-[14px]"
+              onClick={limpiarFechas}
+            >
+              <Eraser size={15} className="shrink-0" /> <span className="truncate">Limpiar</span>
             </button>
-            <button className="dt-btn dt-btn-ghost" onClick={generarPDF}>
-              <FileDown size={16} /> Generar PDF
+            <button
+              className="dt-btn dt-btn-ghost !px-2 !py-2 !text-[12px] sm:!px-4 sm:!py-2.5 sm:!text-[14px]"
+              onClick={generarPDF}
+            >
+              <FileDown size={15} className="shrink-0" /> <span className="truncate">PDF</span>
             </button>
           </div>
         </div>
