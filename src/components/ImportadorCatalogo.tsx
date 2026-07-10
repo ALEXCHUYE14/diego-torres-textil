@@ -42,7 +42,10 @@ function descargarPlantilla() {
   const encabezado = 'codigo,familia,nombre,genero,color,talla,saldo_inicial,valor_inicial\n';
   const ejemplo1 = 'BAT-001,BATA,BATA CLINICA,UNISEX,BLANCO,M,25,38500\n';
   const ejemplo2 = 'EXT-CHAF-01,BIOSEGURIDAD,EXTINTOR MARCA CHAFLUE,,,,3,145000\n';
-  const blob = new Blob([encabezado + ejemplo1 + ejemplo2], { type: 'text/csv;charset=utf-8;' });
+  // Ejemplo con existencia 0: deja explícito que un artículo sin stock inicial
+  // (se codifica ahora, se recibe después) es un caso válido y soportado.
+  const ejemplo3 = 'PAT-099,PANTALON,PANTALON DRIL AZUL,HOMBRE,AZUL,32,0,42000\n';
+  const blob = new Blob([encabezado + ejemplo1 + ejemplo2 + ejemplo3], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -231,8 +234,10 @@ export default function ImportadorCatalogo({
           Para cargar el inventario base del sistema. Columnas exactas:{' '}
           <code className="rounded bg-pizarra-100 px-1.5 py-0.5 font-mono text-[12px]">codigo, familia, nombre</code>
           {' '}(obligatorias); <code className="rounded bg-pizarra-100 px-1.5 py-0.5 font-mono text-[12px]">genero, color, talla, saldo_inicial, valor_inicial</code>{' '}
-          son opcionales. El código lo define usted (no se genera automáticamente). Esto es solo para la carga
-          inicial del catálogo — los movimientos del día a día se registran manualmente desde Entradas y Salidas.
+          son opcionales. El código lo define usted (no se genera automáticamente).{' '}
+          <strong>Si deja <code className="rounded bg-pizarra-100 px-1 py-0.5 font-mono text-[11.5px]">saldo_inicial</code> en 0 o en blanco,
+          el artículo se crea igual, solo que sin existencias</strong> (útil para codificar productos que aún no ha recibido).
+          Esto es solo para la carga inicial del catálogo — los movimientos del día a día se registran manualmente desde Entradas y Salidas.
         </p>
 
         <button type="button" onClick={descargarPlantilla} className="mt-3 inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-indigo-600 hover:text-indigo-700">
