@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { ConfirmModal, PageHeader } from '../components/ui';
+import ImportadorProveedores from '../components/ImportadorProveedores';
 import { Familia, Proveedor } from '../lib/types';
 
 type Pestaña = 'proveedores' | 'familias' | 'colores' | 'tallas' | 'generos';
@@ -256,7 +257,10 @@ function GestionProveedores() {
       </div>
 
       <div className="dt-card p-5 md:p-6">
-        <h2 className="mb-4 text-[16px] font-bold text-pizarra-800">Proveedores registrados</h2>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-[16px] font-bold text-pizarra-800">Proveedores registrados</h2>
+          <ImportadorProveedores deshabilitado={!esOperativo} onCompletado={cargar} />
+        </div>
         {proveedores.length === 0 ? (
           <p className="py-6 text-center text-[13.5px] text-pizarra-400">Aún no hay proveedores</p>
         ) : (
