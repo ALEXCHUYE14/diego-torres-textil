@@ -254,37 +254,29 @@ export default function Dashboard() {
 
       {informe && (
         <>
-          <div className="mt-6 grid gap-6 lg:grid-cols-2">
-            {/* -------- Bloque izquierdo: Volumen -------- */}
-            <section>
-              <h2 className="mb-3 text-[13px] font-bold uppercase tracking-[0.14em] text-pizarra-400">Volumen</h2>
-              <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3">
-                <KpiCard titulo="Stock inicial" valor={numero(informe.stock_inicial)} />
-                <KpiCard titulo="Entradas" valor={numero(informe.entradas)} />
-                <KpiCard titulo="Salidas" valor={numero(informe.salidas)} />
-                <KpiCard titulo="Stock final" valor={numero(informe.stock_final)} acento />
-                <KpiCard titulo="Índice de rotación" valor={String(informe.rotacion)} />
-                <KpiCard titulo="Cobertura" valor={numero(informe.cobertura_dias)} sufijo="días" />
-              </div>
-            </section>
+          {/* -------- Volumen -------- */}
+          <section className="mt-6">
+            <h2 className="mb-3 text-[13px] font-bold uppercase tracking-[0.14em] text-pizarra-400">Volumen</h2>
+            <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-6">
+              <KpiCard titulo="Stock inicial" valor={numero(informe.stock_inicial)} />
+              <KpiCard titulo="Entradas" valor={numero(informe.entradas)} />
+              <KpiCard titulo="Salidas" valor={numero(informe.salidas)} />
+              <KpiCard titulo="Stock final" valor={numero(informe.stock_final)} acento />
+              <KpiCard titulo="Índice de rotación" valor={String(informe.rotacion)} />
+              <KpiCard titulo="Cobertura" valor={numero(informe.cobertura_dias)} sufijo="días" />
+            </div>
+          </section>
 
-            {/* -------- Bloque derecho: Rendimiento / Financiero -------- */}
-            <section>
-              <h2 className="mb-3 text-[13px] font-bold uppercase tracking-[0.14em] text-pizarra-400">Rendimiento · Financiero</h2>
-              <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3">
-                <KpiCard titulo="Prom. entradas/día" valor={numero(informe.promedio_entradas)} />
-                <KpiCard titulo="Prom. salidas/día" valor={numero(informe.promedio_salidas)} />
-                <KpiCard titulo="Ocupación almacén" valor={`${informe.ocupacion_pct}%`} />
-                <KpiCard titulo="Valor inventario inicial" valor={moneda(informe.valor_inicial)} className="col-span-2 sm:col-span-1" />
-                <KpiCard titulo="Valor inventario final" valor={moneda(informe.valor_final)} acento className="col-span-2 sm:col-span-1" />
-                <div className="dt-card col-span-2 p-4 sm:col-span-1">
-                  <p className="text-[12px] font-semibold uppercase tracking-wider text-pizarra-400">Producto top</p>
-                  <p className="mt-1.5 text-[13px] font-semibold leading-snug text-pizarra-800">{informe.producto_top}</p>
-                  <p className="mt-2 text-[11.5px] text-pizarra-400">Mayor stock: {informe.producto_mayor_stock}</p>
-                </div>
-              </div>
-            </section>
-          </div>
+          {/* -------- Rendimiento / Financiero: a lo ancho completo -------- */}
+          <section className="mt-6">
+            <h2 className="mb-3 text-[13px] font-bold uppercase tracking-[0.14em] text-pizarra-400">Rendimiento · Financiero</h2>
+            <div className="grid w-full grid-cols-2 gap-3.5 sm:grid-cols-4">
+              <KpiCard titulo="Prom. entradas/día" valor={numero(informe.promedio_entradas)} />
+              <KpiCard titulo="Prom. salidas/día" valor={numero(informe.promedio_salidas)} />
+              <KpiCard titulo="Valor inventario inicial" valor={moneda(informe.valor_inicial)} />
+              <KpiCard titulo="Valor inventario final" valor={moneda(informe.valor_final)} acento />
+            </div>
+          </section>
 
           {/* -------- Grid dinámico -------- */}
           <div className="dt-card mt-6 p-5 md:p-6">

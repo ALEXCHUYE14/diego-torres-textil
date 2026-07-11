@@ -52,7 +52,7 @@ export default function Login() {
             />
           </div>
 
-          <h1 className="mt-6 text-[28px] font-extrabold tracking-tight text-white md:text-[32px]">Diego Torres</h1>
+          <h1 className="mt-6 text-[28px] font-extrabold tracking-tight text-white md:text-[32px]">Diego Torres S.A.S.</h1>
           <p className="mt-1.5 text-[12.5px] uppercase tracking-[0.22em] text-pizarra-400">Inventario · Kardex · Cierre Contable</p>
           <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-pizarra-500">Comercializadora T&amp;E S.A.S.</p>
 

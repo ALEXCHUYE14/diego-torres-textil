@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useToast } from '../context/ToastContext';
 import { BuscadorProducto, DataTable, KpiCard, PageHeader } from '../components/ui';
 import { DetalleProducto, Movimiento, Producto } from '../lib/types';
-import { fechaSegura, moneda, numero } from '../utils/format';
+import { fechaMovimiento, fechaSegura, moneda, numero } from '../utils/format';
 
 type Modo = 'MES' | 'ANIO' | 'HISTORICO';
 
@@ -97,7 +97,7 @@ export default function Kardex() {
             <DataTable<Movimiento & Record<string, unknown>>
               columnas={[
                 { clave: 'tipo_consecutivo', titulo: 'Consecutivo', render: (m) => <span className="font-mono text-[12.5px]">{m.tipo_consecutivo}</span> },
-                { clave: 'fecha_registro', titulo: 'Fecha', render: (m) => fechaSegura(m.fecha_registro) },
+                { clave: 'fecha_registro', titulo: 'Fecha', render: (m) => fechaMovimiento(m.fecha_registro) },
                 { clave: 'naturaleza', titulo: 'Tipo', render: (m) => (
                   <span className={`rounded-full px-2.5 py-0.5 text-[11.5px] font-bold ${m.naturaleza === 'ENTRADA' ? 'bg-emerald-50 text-emerald-700' : 'bg-borgona-50 text-borgona-600'}`}>
                     {m.tipo_movimiento} · {m.naturaleza}

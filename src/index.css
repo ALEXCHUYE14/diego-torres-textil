@@ -116,6 +116,8 @@ body {
     font-size: 10.5px;
     color: #000;
   }
+  .di-logo-wrap { text-align: center; margin-bottom: 6px; }
+  .di-logo { width: 45mm; max-width: 45mm; height: auto; display: inline-block; }
   .di-encabezado { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
   .di-encabezado p { margin: 0; line-height: 1.5; }
   .di-empresa { font-weight: 700; font-size: 13px; }

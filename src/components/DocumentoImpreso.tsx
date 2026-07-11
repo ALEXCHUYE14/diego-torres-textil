@@ -1,5 +1,5 @@
 import { DocumentoMovimiento } from '../lib/types';
-import { moneda, numero } from '../utils/format';
+import { fechaMovimiento, moneda, numero } from '../utils/format';
 
 /** Formato de impresión (Entrada/Salida) · reemplaza el reporte físico anterior */
 export default function DocumentoImpreso({ doc }: { doc: DocumentoMovimiento }) {
@@ -8,6 +8,10 @@ export default function DocumentoImpreso({ doc }: { doc: DocumentoMovimiento }) 
 
   return (
     <div className="doc-impreso">
+      <div className="di-logo-wrap">
+        <img src="/img/logo.png" alt="Comercializadora T&E S.A.S." className="di-logo" />
+      </div>
+
       <div className="di-encabezado">
         <div>
           <p className="di-empresa">COMERCIALIZADORA T&amp;E S.A.S.</p>
@@ -36,7 +40,10 @@ export default function DocumentoImpreso({ doc }: { doc: DocumentoMovimiento }) 
         <tbody>
           {doc.items.map((it, i) => (
             <tr key={i}>
-              <td>{new Date(it.fecha_registro).toLocaleDateString('es-CO')}</td>
+              {/* fechaMovimiento (no toLocaleDateString): fecha_registro se guarda
+                  como medianoche UTC explícita — leerla en hora local del
+                  navegador corría el día un día hacia atrás en Colombia/Perú. */}
+              <td>{fechaMovimiento(it.fecha_registro)}</td>
               <td>*{it.tipo_movimiento}</td>
               <td>{it.producto_nombre}</td>
               <td>{it.proveedor_nombre ?? '—'}</td>
