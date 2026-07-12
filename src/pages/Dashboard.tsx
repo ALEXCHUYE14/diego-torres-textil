@@ -21,7 +21,7 @@ const etiquetaMes = (anioMes: string): string => {
 
 export default function Dashboard() {
   const { toast } = useToast();
-  const { esOperativo } = useAuth();
+  const { esAdministrador } = useAuth();
   const [desde, setDesde] = useState(inicioMes());
   const [hasta, setHasta] = useState(hoyISO());
   const [informe, setInforme] = useState<InformeCierre | null>(null);
@@ -175,12 +175,12 @@ export default function Dashboard() {
               <input
                 id="mes-cierre" type="month" className="dt-input !w-auto"
                 value={mesSeleccionado} onChange={(e) => setMesSeleccionado(e.target.value)}
-                disabled={!esOperativo}
+                disabled={!esAdministrador}
               />
             </div>
             <button
               className="dt-btn dt-btn-danger"
-              disabled={!esOperativo || procesandoPeriodo || !mesSeleccionado || estaBloqueado(mesSeleccionado)}
+              disabled={!esAdministrador || procesandoPeriodo || !mesSeleccionado || estaBloqueado(mesSeleccionado)}
               onClick={cerrarPeriodo}
             >
               <Lock size={15} /> Cerrar mes
@@ -196,7 +196,7 @@ export default function Dashboard() {
               {periodos.map((p) => (
                 <li key={p.anio_mes} className="flex items-center gap-2 rounded-full border border-borgona-100 bg-borgona-50 px-3 py-1.5 text-[12.5px] font-medium text-borgona-600">
                   <Lock size={12} /> {etiquetaMes(p.anio_mes)}
-                  {esOperativo && (
+                  {esAdministrador && (
                     <button
                       type="button"
                       onClick={() => reabrirPeriodo(p.anio_mes)}
@@ -212,8 +212,8 @@ export default function Dashboard() {
             </ul>
           </>
         )}
-        {!esOperativo && (
-          <p className="mt-3 text-[12.5px] text-pizarra-400">Su rol es Consulta: puede ver el estado de los períodos, pero no cerrarlos ni reabrirlos.</p>
+        {!esAdministrador && (
+          <p className="mt-3 text-[12.5px] text-pizarra-400">Solo un Administrador puede cerrar o reabrir períodos. Usted puede ver su estado.</p>
         )}
       </div>
 

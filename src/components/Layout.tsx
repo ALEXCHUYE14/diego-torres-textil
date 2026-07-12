@@ -2,25 +2,34 @@ import { ReactNode, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import {
   ArrowDownToLine, ArrowUpFromLine, LayoutDashboard, LibraryBig, LogOut,
-  PanelLeftClose, PanelLeftOpen, Printer, ScanBarcode, Search,
+  PanelLeftClose, PanelLeftOpen, Printer, ScanBarcode, Search, Users,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { etiquetaRol } from '../lib/types';
 import PrintModal from './PrintModal';
 
-const NAV = [
-  { a: '/', icono: LayoutDashboard, texto: 'Informe' },
-  { a: '/entradas', icono: ArrowDownToLine, texto: 'Entradas' },
-  { a: '/salidas', icono: ArrowUpFromLine, texto: 'Salidas' },
-  { a: '/articulos', icono: ScanBarcode, texto: 'Artículos' },
-  { a: '/catalogos', icono: LibraryBig, texto: 'Catálogos' },
-  { a: '/kardex', icono: Search, texto: 'Kardex' },
-];
-
 export default function Layout({ children }: { children: ReactNode }) {
   const [colapsado, setColapsado] = useState(false);
   const [printAbierto, setPrintAbierto] = useState(false);
-  const { nombre, rol, salir } = useAuth();
+  const { nombre, rol, esOperativo, esAdministrador, salir } = useAuth();
+
+  // El menú se arma según el rol: Entradas/Salidas solo si puede registrar
+  // movimientos, Usuarios solo para Administrador. No basta con ocultar el
+  // link — la ruta también está protegida (ver RutaProtegida en App.tsx)
+  // para que escribir la URL a mano no sirva de nada.
+  const nav = [
+    { a: '/', icono: LayoutDashboard, texto: 'Informe' },
+    ...(esOperativo ? [
+      { a: '/entradas', icono: ArrowDownToLine, texto: 'Entradas' },
+      { a: '/salidas', icono: ArrowUpFromLine, texto: 'Salidas' },
+    ] : []),
+    { a: '/articulos', icono: ScanBarcode, texto: 'Artículos' },
+    { a: '/catalogos', icono: LibraryBig, texto: 'Catálogos' },
+    { a: '/kardex', icono: Search, texto: 'Kardex' },
+    ...(esAdministrador ? [{ a: '/usuarios', icono: Users, texto: 'Usuarios' }] : []),
+  ];
+
+  const colsMovil = nav.length >= 7 ? 'grid-cols-7' : nav.length === 6 ? 'grid-cols-6' : 'grid-cols-4';
 
   return (
     <div className="min-h-screen">
@@ -41,7 +50,7 @@ export default function Layout({ children }: { children: ReactNode }) {
         <div className="costura-vertical absolute right-0 top-4 bottom-4 opacity-20" />
 
         <nav className="mt-2 flex-1 space-y-1 px-2.5">
-          {NAV.map(({ a, icono: Icono, texto }) => (
+          {nav.map(({ a, icono: Icono, texto }) => (
             <NavLink
               key={a}
               to={a}
@@ -111,8 +120,8 @@ export default function Layout({ children }: { children: ReactNode }) {
       </main>
 
       {/* ================= Bottom Navigation (móvil, estilo app nativa) ================= */}
-      <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-6 border-t border-pizarra-200 bg-white/95 backdrop-blur pb-[env(safe-area-inset-bottom)] md:hidden print:hidden">
-        {NAV.map(({ a, icono: Icono, texto }) => (
+      <nav className={`fixed inset-x-0 bottom-0 z-40 grid ${colsMovil} border-t border-pizarra-200 bg-white/95 backdrop-blur pb-[env(safe-area-inset-bottom)] md:hidden print:hidden`}>
+        {nav.map(({ a, icono: Icono, texto }) => (
           <NavLink
             key={a}
             to={a}

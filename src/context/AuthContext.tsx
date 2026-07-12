@@ -10,13 +10,16 @@ interface AuthCtx {
   rol: Rol;
   nombre: string;
   cargando: boolean;
+  /** Puede escribir: crear artículos, registrar entradas/salidas (Operativo o Administrador). */
   esOperativo: boolean;
+  /** Control total: eliminar artículos, gestionar usuarios, cerrar/abrir meses. */
+  esAdministrador: boolean;
   salir: () => Promise<void>;
 }
 
 const Ctx = createContext<AuthCtx>({
   session: null, rol: 'consulta', nombre: '', cargando: true,
-  esOperativo: false, salir: async () => {},
+  esOperativo: false, esAdministrador: false, salir: async () => {},
 });
 export const useAuth = () => useContext(Ctx);
 
@@ -94,8 +97,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // interrumpir al usuario con la pantalla de carga.
   const cargando = cargandoSesion || (!!session && !perfilListo);
 
+  // Administrador conserva todas las capacidades de Operativo (control
+  // total), por eso esOperativo también es verdadero para administrador.
+  const esAdministrador = rol === 'administrador';
+  const esOperativo = rol === 'operativo' || esAdministrador;
+
   return (
-    <Ctx.Provider value={{ session, rol, nombre, cargando, esOperativo: rol === 'operativo', salir }}>
+    <Ctx.Provider value={{ session, rol, nombre, cargando, esOperativo, esAdministrador, salir }}>
       {children}
     </Ctx.Provider>
   );

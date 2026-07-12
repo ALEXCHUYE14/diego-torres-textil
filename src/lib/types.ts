@@ -2,15 +2,34 @@
 // Tipos del dominio · Diego Torres Textil
 // ============================================================
 
-export type Rol = 'consulta' | 'operativo';
-
 /**
- * Etiqueta visible del rol. El valor de base de datos sigue siendo
- * 'operativo' (así lo esperan las políticas RLS y los RPC en Supabase);
- * "Administrador" es solo la forma en que se muestra en la interfaz,
- * porque ese rol ya tiene permiso sobre todas las funciones del sistema.
+ * Tres roles reales en la base de datos (ver migration_007_rbac.sql):
+ *  - consulta:      solo lectura en todo el sistema.
+ *  - operativo:     crea artículos, registra entradas/salidas, consulta kardex.
+ *                   No puede eliminar artículos ni gestionar usuarios ni
+ *                   cerrar/abrir meses.
+ *  - administrador: todo lo anterior + eliminar artículos + gestión de
+ *                   usuarios + cierre de mes.
  */
-export const etiquetaRol = (r: Rol): string => (r === 'operativo' ? 'Administrador' : 'Consulta');
+export type Rol = 'consulta' | 'operativo' | 'administrador';
+
+export const ROLES_ASIGNABLES: { valor: Rol; etiqueta: string }[] = [
+  { valor: 'operativo', etiqueta: 'Operativo' },
+  { valor: 'consulta', etiqueta: 'Consulta' },
+];
+
+export const etiquetaRol = (r: Rol): string => {
+  if (r === 'administrador') return 'Administrador';
+  if (r === 'operativo') return 'Operativo';
+  return 'Consulta';
+};
+
+export interface Usuario {
+  id_usuario: string;
+  nombre: string;
+  correo: string | null;
+  rol: Rol;
+}
 
 export interface Familia {
   id_familia: string;

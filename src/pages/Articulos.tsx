@@ -10,7 +10,7 @@ import { moneda, numero } from '../utils/format';
 
 export default function Articulos() {
   const { toast } = useToast();
-  const { esOperativo } = useAuth();
+  const { esOperativo, esAdministrador } = useAuth();
   const nombreRef = useRef<HTMLInputElement>(null);
   const catalogoRef = useRef<HTMLDivElement>(null);
 
@@ -176,7 +176,7 @@ export default function Articulos() {
           <div className="grid gap-5 sm:grid-cols-2">
             <div className="sm:col-span-2">
               <label className="dt-label" htmlFor="familia">Familia *</label>
-              <select id="familia" className="dt-input" value={idFamilia} disabled={!habilitado || !!editando}
+              <select id="familia" className="dt-input" value={idFamilia} disabled={!habilitado || !!editando || !esOperativo}
                 onChange={(e) => setIdFamilia(e.target.value)}>
                 <option value="" disabled>Seleccione la familia…</option>
                 {familias.map((f) => (
@@ -186,26 +186,26 @@ export default function Articulos() {
             </div>
             <div className="sm:col-span-2">
               <label className="dt-label" htmlFor="art-nombre">Nombre *</label>
-              <input id="art-nombre" ref={nombreRef} className="dt-input uppercase" disabled={!habilitado}
+              <input id="art-nombre" ref={nombreRef} className="dt-input uppercase" disabled={!habilitado || !esOperativo}
                 value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="BATA · o EXTINTOR MARCA CHAFLUE" />
             </div>
             <div>
               <label className="dt-label" htmlFor="art-genero">Género <span className="font-normal normal-case text-pizarra-400">(opcional)</span></label>
-              <select id="art-genero" className="dt-input" disabled={!habilitado} value={genero} onChange={(e) => setGenero(e.target.value)}>
+              <select id="art-genero" className="dt-input" disabled={!habilitado || !esOperativo} value={genero} onChange={(e) => setGenero(e.target.value)}>
                 <option value="">— No aplica —</option>
                 {generos.map((g) => <option key={g.id_genero} value={g.nombre}>{g.nombre}</option>)}
               </select>
             </div>
             <div>
               <label className="dt-label" htmlFor="art-color">Color <span className="font-normal normal-case text-pizarra-400">(opcional)</span></label>
-              <select id="art-color" className="dt-input" disabled={!habilitado} value={color} onChange={(e) => setColor(e.target.value)}>
+              <select id="art-color" className="dt-input" disabled={!habilitado || !esOperativo} value={color} onChange={(e) => setColor(e.target.value)}>
                 <option value="">— No aplica —</option>
                 {colores.map((c) => <option key={c.id_color} value={c.nombre}>{c.nombre}</option>)}
               </select>
             </div>
             <div>
               <label className="dt-label" htmlFor="art-talla">Talla <span className="font-normal normal-case text-pizarra-400">(opcional)</span></label>
-              <select id="art-talla" className="dt-input" disabled={!habilitado} value={talla} onChange={(e) => setTalla(e.target.value)}>
+              <select id="art-talla" className="dt-input" disabled={!habilitado || !esOperativo} value={talla} onChange={(e) => setTalla(e.target.value)}>
                 <option value="">— No aplica —</option>
                 {tallas.map((t) => <option key={t.id_talla} value={t.nombre}>{t.nombre}</option>)}
               </select>
@@ -224,9 +224,11 @@ export default function Articulos() {
             <button className="dt-btn dt-btn-ghost" disabled={!editando} onClick={() => setHabilitado(true)}>
               <Pencil size={16} /> Editar
             </button>
-            <button className="dt-btn dt-btn-ghost !text-borgona-600 hover:!bg-borgona-50" disabled={!editando} onClick={() => editando && setAEliminar(editando)}>
-              <Trash2 size={16} /> Eliminar
-            </button>
+            {esAdministrador && (
+              <button className="dt-btn dt-btn-ghost !text-borgona-600 hover:!bg-borgona-50" disabled={!editando} onClick={() => editando && setAEliminar(editando)}>
+                <Trash2 size={16} /> Eliminar
+              </button>
+            )}
             <button className="dt-btn dt-btn-primary ml-auto" onClick={guardar} disabled={guardando || !esOperativo || (!!editando && !habilitado)}>
               <Save size={17} /> {guardando ? 'Guardando…' : editando ? 'Guardar cambios' : 'Guardar'}
             </button>
@@ -269,9 +271,11 @@ export default function Articulos() {
                 <button className="rounded-lg p-1.5 text-pizarra-400 hover:bg-indigo-600/10 hover:text-indigo-600 transition" onClick={() => editar(p)} aria-label={`Editar ${p.nombre}`}>
                   <Pencil size={15} />
                 </button>
-                <button className="rounded-lg p-1.5 text-pizarra-400 hover:bg-borgona-50 hover:text-borgona-600 transition" onClick={() => setAEliminar(p)} aria-label={`Eliminar ${p.nombre}`}>
-                  <Trash2 size={15} />
-                </button>
+                {esAdministrador && (
+                  <button className="rounded-lg p-1.5 text-pizarra-400 hover:bg-borgona-50 hover:text-borgona-600 transition" onClick={() => setAEliminar(p)} aria-label={`Eliminar ${p.nombre}`}>
+                    <Trash2 size={15} />
+                  </button>
+                )}
               </div>
             )},
           ]}
