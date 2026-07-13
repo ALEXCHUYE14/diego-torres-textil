@@ -56,7 +56,7 @@ export default function Kardex() {
 
       <div className="dt-card p-5 md:p-6">
         <label className="dt-label">Consultar producto</label>
-        <BuscadorProducto onSeleccion={(p) => consultar(p)} autoFocus />
+        <BuscadorProducto onSeleccion={(p) => consultar(p)} autoFocus soloActivos={false} />
         {noEncontrado && (
           <p className="mt-3 text-[14px] font-semibold text-red-600">(Producto no encontrado)</p>
         )}
@@ -66,7 +66,12 @@ export default function Kardex() {
         <>
           {/* -------- Cabecera del producto -------- */}
           <div className="dt-card mt-6 p-5 md:p-6">
-            <p className="font-mono text-[13px] text-indigo-600">{detalle.producto.codigo_barra}</p>
+            <div className="flex items-center gap-2">
+              <p className="font-mono text-[13px] text-indigo-600">{detalle.producto.codigo_barra}</p>
+              {!detalle.producto.activo && (
+                <span className="rounded-full bg-pizarra-100 px-2 py-0.5 text-[11px] font-semibold text-pizarra-500">Inactivo</span>
+              )}
+            </div>
             <h2 className="mt-1 text-[20px] font-bold text-pizarra-800">
               {[detalle.producto.nombre, detalle.producto.genero, detalle.producto.color, detalle.producto.talla && `Talla ${detalle.producto.talla}`]
                 .filter(Boolean).join(' · ')}

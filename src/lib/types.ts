@@ -70,6 +70,7 @@ export interface Producto {
   ultimo_valor_unitario: number;
   precio_venta: number;
   activo: boolean;
+  tiene_movimientos: boolean;
   fecha_creacion: string;
 }
 

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Pencil, Plus, Save, Trash2 } from 'lucide-react';
+import { Pencil, Plus, Power, PowerOff, Save, Trash2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -27,7 +27,9 @@ export default function Articulos() {
   const [editando, setEditando] = useState<Producto | null>(null);
   const [habilitado, setHabilitado] = useState(true);
   const [aEliminar, setAEliminar] = useState<Producto | null>(null);
+  const [aCambiarEstado, setACambiarEstado] = useState<Producto | null>(null);
   const [guardando, setGuardando] = useState(false);
+  const [cambiandoEstado, setCambiandoEstado] = useState(false);
   const [destacadoId, setDestacadoId] = useState<string | null>(null);
 
   const familia = familias.find((f) => f.id_familia === idFamilia) ?? null;
@@ -53,7 +55,7 @@ export default function Articulos() {
         { data: g, error: e3 }, { data: c, error: e4 }, { data: t, error: e5 },
       ] = await Promise.all([
         supabase.from('familias').select('*').order('codigo'),
-        supabase.from('productos').select('*').eq('activo', true).order('fecha_creacion', { ascending: false }),
+        supabase.from('productos').select('*').order('activo', { ascending: false }).order('fecha_creacion', { ascending: false }),
         supabase.from('generos').select('*').order('nombre'),
         supabase.from('colores').select('*').order('nombre'),
         supabase.from('tallas').select('*').order('nombre'),
@@ -147,18 +149,61 @@ export default function Articulos() {
         .from('productos')
         .update({ activo: false })
         .eq('id_producto', aEliminar.id_producto);
-      if (error) {
-        // El trigger de base de datos bloquea la baja si el artículo ya tiene
-        // movimientos; su mensaje ya es claro y se muestra tal cual.
-        toast('error', error.message);
-        return;
-      }
+      if (error) { toast('error', error.message); return; }
       toast('exito', 'Código eliminado del catálogo');
       cargar();
     } catch {
       toast('error', 'Error de red al eliminar el código. Verifique su conexión.');
     } finally {
       setAEliminar(null);
+    }
+  };
+
+  // A diferencia de "eliminar" (solo para artículos sin historial), esto
+  // alterna activo/inactivo en artículos que YA tienen movimientos: no se
+  // pueden borrar sin perder trazabilidad, pero sí se pueden dejar de
+  // ofrecer para nuevas entradas/salidas. El kardex y los informes lo
+  // siguen mostrando con normalidad; solo cambia si aparece como opción al
+  // registrar movimientos nuevos.
+  const cambiarEstado = async () => {
+    if (!aCambiarEstado) return;
+    setCambiandoEstado(true);
+    try {
+      const { error } = await supabase
+        .from('productos')
+        .update({ activo: !aCambiarEstado.activo })
+        .eq('id_producto', aCambiarEstado.id_producto);
+      if (error) {
+        toast('error', error.code === '23505'
+          ? 'No se puede activar: ya existe otro artículo activo con el mismo nombre, género, color y talla en esta familia.'
+          : error.message);
+        return;
+      }
+      toast('exito', aCambiarEstado.activo ? `${aCambiarEstado.nombre} desactivado` : `${aCambiarEstado.nombre} activado`);
+      cargar();
+    } catch {
+      toast('error', 'Error de red al cambiar el estado del artículo. Verifique su conexión.');
+    } finally {
+      setCambiandoEstado(false);
+      setACambiarEstado(null);
+    }
+  };
+
+  // Reactivar es una acción de bajo riesgo (siempre reversible con
+  // "Desactivar" de nuevo) — no necesita modal de confirmación.
+  const reactivar = async (p: Producto) => {
+    try {
+      const { error } = await supabase.from('productos').update({ activo: true }).eq('id_producto', p.id_producto);
+      if (error) {
+        toast('error', error.code === '23505'
+          ? 'No se puede activar: ya existe otro artículo activo con el mismo nombre, género, color y talla en esta familia.'
+          : error.message);
+        return;
+      }
+      toast('exito', `${p.nombre} activado`);
+      cargar();
+    } catch {
+      toast('error', 'Error de red al activar el artículo. Verifique su conexión.');
     }
   };
 
@@ -224,10 +269,20 @@ export default function Articulos() {
             <button className="dt-btn dt-btn-ghost" disabled={!editando} onClick={() => setHabilitado(true)}>
               <Pencil size={16} /> Editar
             </button>
-            {esAdministrador && (
-              <button className="dt-btn dt-btn-ghost !text-borgona-600 hover:!bg-borgona-50" disabled={!editando} onClick={() => editando && setAEliminar(editando)}>
-                <Trash2 size={16} /> Eliminar
-              </button>
+            {esAdministrador && editando && (
+              !editando.activo ? (
+                <button className="dt-btn dt-btn-ghost !text-emerald-600 hover:!bg-emerald-50" onClick={() => reactivar(editando)}>
+                  <Power size={16} /> Activar
+                </button>
+              ) : editando.tiene_movimientos ? (
+                <button className="dt-btn dt-btn-ghost !text-borgona-600 hover:!bg-borgona-50" onClick={() => setACambiarEstado(editando)}>
+                  <PowerOff size={16} /> Desactivar
+                </button>
+              ) : (
+                <button className="dt-btn dt-btn-ghost !text-borgona-600 hover:!bg-borgona-50" onClick={() => setAEliminar(editando)}>
+                  <Trash2 size={16} /> Eliminar
+                </button>
+              )
             )}
             <button className="dt-btn dt-btn-primary ml-auto" onClick={guardar} disabled={guardando || !esOperativo || (!!editando && !habilitado)}>
               <Save size={17} /> {guardando ? 'Guardando…' : editando ? 'Guardar cambios' : 'Guardar'}
@@ -266,15 +321,30 @@ export default function Articulos() {
             { clave: 'nombre', titulo: 'Artículo', render: (p) => [p.nombre, p.color, p.talla].filter(Boolean).join(' · ') },
             { clave: 'stock_real', titulo: 'Stock', numerica: true, render: (p) => numero(p.stock_real) },
             { clave: 'costo_promedio_ponderado', titulo: 'CPP', numerica: true, render: (p) => moneda(p.costo_promedio_ponderado) },
+            { clave: 'activo', titulo: 'Estado', render: (p) => (
+              <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${p.activo ? 'bg-emerald-50 text-emerald-600' : 'bg-pizarra-100 text-pizarra-500'}`}>
+                {p.activo ? 'Activo' : 'Inactivo'}
+              </span>
+            )},
             { clave: 'id_producto', titulo: '', render: (p) => (
               <div className="flex justify-end gap-1.5">
                 <button className="rounded-lg p-1.5 text-pizarra-400 hover:bg-indigo-600/10 hover:text-indigo-600 transition" onClick={() => editar(p)} aria-label={`Editar ${p.nombre}`}>
                   <Pencil size={15} />
                 </button>
                 {esAdministrador && (
-                  <button className="rounded-lg p-1.5 text-pizarra-400 hover:bg-borgona-50 hover:text-borgona-600 transition" onClick={() => setAEliminar(p)} aria-label={`Eliminar ${p.nombre}`}>
-                    <Trash2 size={15} />
-                  </button>
+                  !p.activo ? (
+                    <button className="rounded-lg p-1.5 text-pizarra-400 hover:bg-emerald-50 hover:text-emerald-600 transition" onClick={() => reactivar(p)} aria-label={`Activar ${p.nombre}`}>
+                      <Power size={15} />
+                    </button>
+                  ) : p.tiene_movimientos ? (
+                    <button className="rounded-lg p-1.5 text-pizarra-400 hover:bg-borgona-50 hover:text-borgona-600 transition" onClick={() => setACambiarEstado(p)} aria-label={`Desactivar ${p.nombre}`}>
+                      <PowerOff size={15} />
+                    </button>
+                  ) : (
+                    <button className="rounded-lg p-1.5 text-pizarra-400 hover:bg-borgona-50 hover:text-borgona-600 transition" onClick={() => setAEliminar(p)} aria-label={`Eliminar ${p.nombre}`}>
+                      <Trash2 size={15} />
+                    </button>
+                  )
                 )}
               </div>
             )},
@@ -290,9 +360,19 @@ export default function Articulos() {
       <ConfirmModal
         abierto={aEliminar !== null}
         titulo="Eliminar código"
-        mensaje={`¿Está seguro de que desea eliminar este código? ${aEliminar?.codigo_barra ?? ''} saldrá del catálogo activo. Si ya tiene movimientos registrados, el sistema no lo permitirá.`}
+        mensaje={`¿Está seguro de que desea eliminar este código? ${aEliminar?.codigo_barra ?? ''} saldrá del catálogo. Como todavía no tiene movimientos registrados, no queda ningún historial asociado.`}
         onConfirmar={eliminar}
         onCancelar={() => setAEliminar(null)}
+      />
+
+      <ConfirmModal
+        abierto={aCambiarEstado !== null}
+        titulo="Desactivar artículo"
+        mensaje={`¿Está seguro de que desea desactivar ${aCambiarEstado?.codigo_barra ?? ''}? Dejará de ofrecerse para nuevas entradas y salidas, pero su historial seguirá disponible en el kardex y en los informes. Puede volver a activarlo cuando lo necesite.`}
+        onConfirmar={cambiarEstado}
+        onCancelar={() => setACambiarEstado(null)}
+        textoConfirmar={cambiandoEstado ? 'Desactivando…' : 'Desactivar'}
+        deshabilitado={cambiandoEstado}
       />
     </div>
   );

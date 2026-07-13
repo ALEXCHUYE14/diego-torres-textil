@@ -47,12 +47,14 @@ export function ConfirmModal({
    Buscador dinámico de productos con autocompletado
    ============================================================ */
 export function BuscadorProducto({
-  onSeleccion, autoFocus, inputRef, placeholder = 'Buscar por nombre o código…',
+  onSeleccion, autoFocus, inputRef, placeholder = 'Buscar por nombre o código…', soloActivos = true,
 }: {
   onSeleccion: (p: Producto) => void;
   autoFocus?: boolean;
   inputRef?: React.RefObject<HTMLInputElement>;
   placeholder?: string;
+  /** false permite encontrar artículos inactivos (ej. Kardex, para auditar historial). */
+  soloActivos?: boolean;
 }) {
   const [q, setQ] = useState('');
   const [resultados, setResultados] = useState<Producto[]>([]);
@@ -71,18 +73,18 @@ export function BuscadorProducto({
       // descripciones textiles, ej. "DRI (Dril)") rompe la sintaxis del
       // filtro .or() y la búsqueda devuelve "sin coincidencias" en silencio.
       const termino = q.trim().replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-      const { data } = await supabase
+      let consulta = supabase
         .from('productos')
         .select('*')
-        .or(`nombre.ilike."%${termino}%",codigo_barra.ilike."%${termino}%"`)
-        .eq('activo', true)
-        .limit(8);
+        .or(`nombre.ilike."%${termino}%",codigo_barra.ilike."%${termino}%"`);
+      if (soloActivos) consulta = consulta.eq('activo', true);
+      const { data } = await consulta.limit(8);
       setResultados((data as Producto[]) ?? []);
       setAbierto(true);
       setCursor(-1);
     }, 220);
     return () => clearTimeout(timer.current);
-  }, [q]);
+  }, [q, soloActivos]);
 
   const elegir = (p: Producto) => {
     onSeleccion(p);
@@ -122,7 +124,12 @@ export function BuscadorProducto({
                 onMouseDown={(e) => { e.preventDefault(); elegir(p); }}
                 className={`flex w-full flex-col gap-0.5 px-4 py-2.5 text-left transition ${i === cursor ? 'bg-indigo-600/10' : 'hover:bg-pizarra-50'}`}
               >
-                <span className="font-mono text-[12px] text-indigo-600">{p.codigo_barra}</span>
+                <span className="flex items-center gap-1.5 font-mono text-[12px] text-indigo-600">
+                  {p.codigo_barra}
+                  {!p.activo && (
+                    <span className="rounded-full bg-pizarra-100 px-1.5 py-0.5 font-sans text-[10px] font-semibold text-pizarra-500">Inactivo</span>
+                  )}
+                </span>
                 <span className="text-[14px] font-medium text-pizarra-800">
                   {[p.nombre, p.color, p.talla && `Talla ${p.talla}`].filter(Boolean).join(' · ')}
                 </span>
