@@ -47,7 +47,7 @@ export function ConfirmModal({
    Buscador dinámico de productos con autocompletado
    ============================================================ */
 export function BuscadorProducto({
-  onSeleccion, autoFocus, inputRef, placeholder = 'Buscar por nombre o código…', soloActivos = true,
+  onSeleccion, autoFocus, inputRef, placeholder = 'Buscar por nombre o código…', soloActivos = true, disabled,
 }: {
   onSeleccion: (p: Producto) => void;
   autoFocus?: boolean;
@@ -55,6 +55,7 @@ export function BuscadorProducto({
   placeholder?: string;
   /** false permite encontrar artículos inactivos (ej. Kardex, para auditar historial). */
   soloActivos?: boolean;
+  disabled?: boolean;
 }) {
   const [q, setQ] = useState('');
   const [resultados, setResultados] = useState<Producto[]>([]);
@@ -63,11 +64,19 @@ export function BuscadorProducto({
   const localRef = useRef<HTMLInputElement>(null);
   const ref = inputRef ?? localRef;
   const timer = useRef<ReturnType<typeof setTimeout>>();
+  // Cuenta cada búsqueda disparada; si una respuesta llega y ya no es la
+  // más reciente (por ejemplo, la red reordenó dos respuestas), se
+  // descarta. Sin esto, una búsqueda vieja podía pisar los resultados de
+  // una más nueva y mostrar coincidencias que no corresponden al texto que
+  // el usuario realmente escribió — riesgoso aquí porque este buscador se
+  // usa para elegir el artículo de una línea de Entradas/Salidas/Kardex.
+  const idBusqueda = useRef(0);
 
   useEffect(() => {
     clearTimeout(timer.current);
     if (q.trim().length < 2) { setResultados([]); setAbierto(false); return; }
     timer.current = setTimeout(async () => {
+      const idActual = ++idBusqueda.current;
       // Envuelto en comillas dobles y escapado: sin esto, un nombre con coma,
       // paréntesis u otro carácter reservado de PostgREST (frecuente en
       // descripciones textiles, ej. "DRI (Dril)") rompe la sintaxis del
@@ -79,6 +88,7 @@ export function BuscadorProducto({
         .or(`nombre.ilike."%${termino}%",codigo_barra.ilike."%${termino}%"`);
       if (soloActivos) consulta = consulta.eq('activo', true);
       const { data } = await consulta.limit(8);
+      if (idActual !== idBusqueda.current) return;
       setResultados((data as Producto[]) ?? []);
       setAbierto(true);
       setCursor(-1);
@@ -99,6 +109,7 @@ export function BuscadorProducto({
         ref={ref}
         value={q}
         autoFocus={autoFocus}
+        disabled={disabled}
         onChange={(e) => setQ(e.target.value)}
         onKeyDown={(e) => {
           if (!abierto || resultados.length === 0) return;

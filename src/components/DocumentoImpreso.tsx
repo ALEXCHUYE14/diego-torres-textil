@@ -38,7 +38,7 @@ export default function DocumentoImpreso({ doc }: { doc: DocumentoMovimiento }) 
           </tr>
         </thead>
         <tbody>
-          {doc.items.map((it, i) => (
+          {(doc.items ?? []).map((it, i) => (
             <tr key={i}>
               {/* fechaMovimiento (no toLocaleDateString): fecha_registro se guarda
                   como medianoche UTC explícita — leerla en hora local del

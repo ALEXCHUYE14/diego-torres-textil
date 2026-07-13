@@ -29,6 +29,7 @@ export default function Articulos() {
   const [aEliminar, setAEliminar] = useState<Producto | null>(null);
   const [aCambiarEstado, setACambiarEstado] = useState<Producto | null>(null);
   const [guardando, setGuardando] = useState(false);
+  const [eliminando, setEliminando] = useState(false);
   const [cambiandoEstado, setCambiandoEstado] = useState(false);
   const [destacadoId, setDestacadoId] = useState<string | null>(null);
   const [purgaAbierta, setPurgaAbierta] = useState(false);
@@ -147,6 +148,7 @@ export default function Articulos() {
 
   const eliminar = async () => {
     if (!aEliminar) return;
+    setEliminando(true);
     try {
       const { error } = await supabase
         .from('productos')
@@ -154,10 +156,17 @@ export default function Articulos() {
         .eq('id_producto', aEliminar.id_producto);
       if (error) { toast('error', error.message); return; }
       toast('exito', 'Código eliminado del catálogo');
+      // Si el artículo eliminado es el que está abierto en el panel de
+      // edición, se limpia el formulario — de lo contrario "Guardar
+      // cambios" seguiría apuntando a una fila que ya no está activa, y
+      // los botones de acción (Eliminar/Desactivar/Activar) quedarían
+      // calculados con datos obsoletos.
+      if (editando?.id_producto === aEliminar.id_producto) agregar();
       cargar();
     } catch {
       toast('error', 'Error de red al eliminar el código. Verifique su conexión.');
     } finally {
+      setEliminando(false);
       setAEliminar(null);
     }
   };
@@ -183,6 +192,7 @@ export default function Articulos() {
         return;
       }
       toast('exito', aCambiarEstado.activo ? `${aCambiarEstado.nombre} desactivado` : `${aCambiarEstado.nombre} activado`);
+      if (editando?.id_producto === aCambiarEstado.id_producto) agregar();
       cargar();
     } catch {
       toast('error', 'Error de red al cambiar el estado del artículo. Verifique su conexión.');
@@ -204,6 +214,7 @@ export default function Articulos() {
         return;
       }
       toast('exito', `${p.nombre} activado`);
+      if (editando?.id_producto === p.id_producto) agregar();
       cargar();
     } catch {
       toast('error', 'Error de red al activar el artículo. Verifique su conexión.');
@@ -223,6 +234,12 @@ export default function Articulos() {
       toast('exito', `Catálogo eliminado: ${data.articulos_eliminados} artículo(s) y ${data.movimientos_eliminados} movimiento(s) borrados`);
       setPurgaAbierta(false);
       setPurgaTexto('');
+      // Ningún artículo sobrevive a la purga — si el panel de edición tenía
+      // algo abierto, "Guardar cambios" apuntaría a una fila que ya no
+      // existe (Supabase no reporta error por un UPDATE de 0 filas
+      // afectadas, así que sin este reseteo se vería un falso "actualizado
+      // con éxito").
+      agregar();
       await cargar();
     } catch {
       toast('error', 'Error de red al eliminar el catálogo. Verifique su conexión.');
@@ -258,7 +275,7 @@ export default function Articulos() {
           <div className="grid gap-5 sm:grid-cols-2">
             <div className="sm:col-span-2">
               <label className="dt-label" htmlFor="familia">Familia *</label>
-              <select id="familia" className="dt-input" value={idFamilia} disabled={!habilitado || !!editando || !esOperativo}
+              <select id="familia" className="dt-input" value={idFamilia} disabled={!habilitado || !!editando || !esOperativo || guardando}
                 onChange={(e) => setIdFamilia(e.target.value)}>
                 <option value="" disabled>Seleccione la familia…</option>
                 {familias.map((f) => (
@@ -268,26 +285,26 @@ export default function Articulos() {
             </div>
             <div className="sm:col-span-2">
               <label className="dt-label" htmlFor="art-nombre">Nombre *</label>
-              <input id="art-nombre" ref={nombreRef} className="dt-input uppercase" disabled={!habilitado || !esOperativo}
+              <input id="art-nombre" ref={nombreRef} className="dt-input uppercase" disabled={!habilitado || !esOperativo || guardando}
                 value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="BATA · o EXTINTOR MARCA CHAFLUE" />
             </div>
             <div>
               <label className="dt-label" htmlFor="art-genero">Género <span className="font-normal normal-case text-pizarra-400">(opcional)</span></label>
-              <select id="art-genero" className="dt-input" disabled={!habilitado || !esOperativo} value={genero} onChange={(e) => setGenero(e.target.value)}>
+              <select id="art-genero" className="dt-input" disabled={!habilitado || !esOperativo || guardando} value={genero} onChange={(e) => setGenero(e.target.value)}>
                 <option value="">— No aplica —</option>
                 {generos.map((g) => <option key={g.id_genero} value={g.nombre}>{g.nombre}</option>)}
               </select>
             </div>
             <div>
               <label className="dt-label" htmlFor="art-color">Color <span className="font-normal normal-case text-pizarra-400">(opcional)</span></label>
-              <select id="art-color" className="dt-input" disabled={!habilitado || !esOperativo} value={color} onChange={(e) => setColor(e.target.value)}>
+              <select id="art-color" className="dt-input" disabled={!habilitado || !esOperativo || guardando} value={color} onChange={(e) => setColor(e.target.value)}>
                 <option value="">— No aplica —</option>
                 {colores.map((c) => <option key={c.id_color} value={c.nombre}>{c.nombre}</option>)}
               </select>
             </div>
             <div>
               <label className="dt-label" htmlFor="art-talla">Talla <span className="font-normal normal-case text-pizarra-400">(opcional)</span></label>
-              <select id="art-talla" className="dt-input" disabled={!habilitado || !esOperativo} value={talla} onChange={(e) => setTalla(e.target.value)}>
+              <select id="art-talla" className="dt-input" disabled={!habilitado || !esOperativo || guardando} value={talla} onChange={(e) => setTalla(e.target.value)}>
                 <option value="">— No aplica —</option>
                 {tallas.map((t) => <option key={t.id_talla} value={t.nombre}>{t.nombre}</option>)}
               </select>
@@ -400,6 +417,8 @@ export default function Articulos() {
         mensaje={`¿Está seguro de que desea eliminar este código? ${aEliminar?.codigo_barra ?? ''} saldrá del catálogo. Como todavía no tiene movimientos registrados, no queda ningún historial asociado.`}
         onConfirmar={eliminar}
         onCancelar={() => setAEliminar(null)}
+        textoConfirmar={eliminando ? 'Eliminando…' : 'Eliminar'}
+        deshabilitado={eliminando}
       />
 
       <ConfirmModal

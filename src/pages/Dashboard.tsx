@@ -140,7 +140,7 @@ export default function Dashboard() {
       styles: { fontSize: 8, cellPadding: 1.8 },
       headStyles: { fillColor: [30, 41, 59] },
       head: [['Código', 'Descripción', 'Stock Inicial', 'Entradas', 'Salidas', 'Stock Final', 'Valor Total']],
-      body: informe.grid.map((f) => [
+      body: (informe.grid ?? []).map((f) => [
         f.codigo, f.descripcion, numero(f.stock_inicial), numero(f.entradas),
         numero(f.salidas), numero(f.stock_final), moneda(f.valor_total),
       ]),
@@ -238,7 +238,7 @@ export default function Dashboard() {
             </button>
             <button
               className="dt-btn dt-btn-ghost !px-2 !py-2 !text-[12px] sm:!px-4 sm:!py-2.5 sm:!text-[14px]"
-              onClick={limpiarFechas}
+              onClick={limpiarFechas} disabled={cargando}
             >
               <Eraser size={15} className="shrink-0" /> <span className="truncate">Limpiar</span>
             </button>
@@ -291,7 +291,7 @@ export default function Dashboard() {
                 { clave: 'stock_final', titulo: 'Stock Final', numerica: true, render: (f) => numero(f.stock_final) },
                 { clave: 'valor_total', titulo: 'Valor Total', numerica: true, render: (f) => moneda(f.valor_total) },
               ]}
-              filas={informe.grid as Array<FilaInforme & Record<string, unknown>>}
+              filas={(informe.grid ?? []) as Array<FilaInforme & Record<string, unknown>>}
               porPagina={12}
               vacio="Sin artículos activos"
             />

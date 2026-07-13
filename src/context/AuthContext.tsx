@@ -32,10 +32,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [perfilListo, setPerfilListo] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      setCargandoSesion(false);
-    });
+    supabase.auth.getSession()
+      .then(({ data }) => {
+        setSession(data.session);
+        setCargandoSesion(false);
+      })
+      // Sin este .catch(), un rechazo de esta promesa (ej. una falla de red
+      // durante la carga inicial) dejaba cargandoSesion en `true` para
+      // siempre — la pantalla de carga nunca se soltaba, sin ningún mensaje
+      // visible de qué pasó.
+      .catch(() => setCargandoSesion(false));
     const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
     return () => sub.subscription.unsubscribe();
   }, []);

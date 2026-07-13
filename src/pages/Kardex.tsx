@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { CalendarClock, CalendarDays, CalendarRange } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useToast } from '../context/ToastContext';
@@ -16,8 +16,14 @@ export default function Kardex() {
   const [modo, setModo] = useState<Modo>('MES');
   const [anio, setAnio] = useState(new Date().getFullYear() - 1);
   const [cargando, setCargando] = useState(false);
+  // Igual que en BuscadorProducto: si el usuario cambia de producto o de
+  // modo (Mes/Año/Histórico) rápido, dos consultas quedan en vuelo a la
+  // vez; sin esto, la que responde más tarde pisa a la más reciente y la
+  // tabla mostrada deja de corresponder con el botón de modo resaltado.
+  const idConsulta = useRef(0);
 
   const consultar = async (p: Producto, m: Modo = modo, a: number = anio) => {
+    const idActual = ++idConsulta.current;
     setCargando(true);
     setNoEncontrado(false);
     try {
@@ -29,14 +35,16 @@ export default function Kardex() {
           p_anio: m === 'HISTORICO' ? a : null,
         }),
       ]);
+      if (idActual !== idConsulta.current) return;
       if (e1 || e2) { toast('error', (e1 ?? e2)!.message); return; }
       if (!det) { setNoEncontrado(true); setDetalle(null); setMovimientos([]); return; }
       setDetalle(det as DetalleProducto);
       setMovimientos((kdx as Movimiento[]) ?? []);
     } catch {
+      if (idActual !== idConsulta.current) return;
       toast('error', 'Error de red al consultar el kardex. Verifique su conexión.');
     } finally {
-      setCargando(false);
+      if (idActual === idConsulta.current) setCargando(false);
     }
   };
 

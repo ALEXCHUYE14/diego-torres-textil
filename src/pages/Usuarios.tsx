@@ -20,6 +20,7 @@ export default function Usuarios() {
   const [guardandoRolId, setGuardandoRolId] = useState<string | null>(null);
   const [aEliminar, setAEliminar] = useState<Usuario | null>(null);
   const [eliminando, setEliminando] = useState(false);
+  const [aCambiarRol, setACambiarRol] = useState<{ usuario: Usuario; nuevoRol: Rol } | null>(null);
 
   const cargar = async () => {
     setCargandoLista(true);
@@ -69,7 +70,9 @@ export default function Usuarios() {
     }
   };
 
-  const cambiarRol = async (u: Usuario, nuevoRol: Rol) => {
+  const cambiarRol = async () => {
+    if (!aCambiarRol) return;
+    const { usuario: u, nuevoRol } = aCambiarRol;
     setGuardandoRolId(u.id_usuario);
     try {
       const { error } = await supabase.from('usuarios').update({ rol: nuevoRol }).eq('id_usuario', u.id_usuario);
@@ -80,6 +83,7 @@ export default function Usuarios() {
       toast('error', 'Error de red al actualizar el rol. Verifique su conexión.');
     } finally {
       setGuardandoRolId(null);
+      setACambiarRol(null);
     }
   };
 
@@ -173,7 +177,7 @@ export default function Usuarios() {
                         value={u.rol}
                         disabled={guardandoRolId === u.id_usuario || esUnoMismo}
                         title={esUnoMismo ? 'No puede cambiar su propio rol desde aquí' : undefined}
-                        onChange={(e) => cambiarRol(u, e.target.value as Rol)}
+                        onChange={(e) => setACambiarRol({ usuario: u, nuevoRol: e.target.value as Rol })}
                       >
                         <option value="administrador">Administrador</option>
                         <option value="operativo">Operativo</option>
@@ -205,6 +209,16 @@ export default function Usuarios() {
         onCancelar={() => setAEliminar(null)}
         textoConfirmar={eliminando ? 'Eliminando…' : 'Eliminar'}
         deshabilitado={eliminando}
+      />
+
+      <ConfirmModal
+        abierto={aCambiarRol !== null}
+        titulo="Cambiar rol"
+        mensaje={`¿Está seguro de que desea cambiar el rol de ${aCambiarRol?.usuario.nombre ?? ''} a ${aCambiarRol ? etiquetaRol(aCambiarRol.nuevoRol) : ''}? Su acceso al sistema cambia de inmediato.`}
+        onConfirmar={cambiarRol}
+        onCancelar={() => setACambiarRol(null)}
+        textoConfirmar={guardandoRolId ? 'Guardando…' : 'Cambiar rol'}
+        deshabilitado={guardandoRolId !== null}
       />
     </div>
   );

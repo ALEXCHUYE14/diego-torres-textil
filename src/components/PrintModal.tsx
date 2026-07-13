@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { FileDown, Printer, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useToast } from '../context/ToastContext';
@@ -16,6 +16,21 @@ export default function PrintModal({ abierto, onCerrar }: { abierto: boolean; on
   const [numeroDoc, setNumeroDoc] = useState('');
   const [cargando, setCargando] = useState(false);
   const [documento, setDocumento] = useState<DocumentoMovimiento | null>(null);
+
+  // Un setTimeout de tiempo fijo es una apuesta: un documento con muchas
+  // líneas (o un dispositivo lento) podría no haber terminado de pintarse
+  // en el DOM cuando se cumplen los milisegundos, imprimiendo en blanco o
+  // incompleto. Con "doble rAF" se espera a que el navegador confirme que
+  // ya pintó el frame donde entró `documento` antes de invocar la
+  // impresión — funciona sin importar cuánto tarde el layout.
+  useEffect(() => {
+    if (!documento) return;
+    let id2 = 0;
+    const id1 = requestAnimationFrame(() => {
+      id2 = requestAnimationFrame(() => window.print());
+    });
+    return () => { cancelAnimationFrame(id1); cancelAnimationFrame(id2); };
+  }, [documento]);
 
   if (!abierto) return null;
 
@@ -37,8 +52,6 @@ export default function PrintModal({ abierto, onCerrar }: { abierto: boolean; on
       if (!data) { toast('error', 'Documento no encontrado en Supabase'); return; }
 
       setDocumento(data as DocumentoMovimiento);
-      // Espera a que el documento esté en el DOM antes de invocar la impresión
-      setTimeout(() => window.print(), 250);
       toast('exito', 'Documento listo para imprimir');
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Error al generar el documento';

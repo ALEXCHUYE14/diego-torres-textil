@@ -63,6 +63,14 @@ export default function Salidas() {
     buscadorRef.current?.focus();
   };
 
+  // Distinto del reseteo automático post-guardado: el usuario pulsa esto
+  // explícitamente para empezar un documento nuevo, así que además debe
+  // ocultar el aviso "guardada con éxito · Documento N" del envío anterior.
+  const limpiarManual = () => {
+    setDocumentoGuardado(null);
+    limpiar();
+  };
+
   const guardar = async (e: FormEvent) => {
     e.preventDefault();
     setDocumentoGuardado(null);
@@ -87,7 +95,7 @@ export default function Salidas() {
         if (msg.includes('STOCK_INSUFICIENTE')) {
           msg = msg.replace(/^.*?:/, '').trim() || 'Stock insuficiente en uno de los artículos.';
         } else if (msg.includes('PERIODO_CERRADO')) {
-          msg = msg.replace(/^.*?:/, '').trim();
+          msg = msg.replace(/^.*?:/, '').trim() || 'El período contable de esta fecha está cerrado.';
         }
         toast('error', msg);
         return;
@@ -118,7 +126,7 @@ export default function Salidas() {
         <div className="grid gap-5 md:grid-cols-2">
           <div>
             <label className="dt-label" htmlFor="tipo-sal">Tipo de movimiento</label>
-            <select id="tipo-sal" className="dt-input" value={tipoMov} onChange={(e) => setTipoMov(e.target.value)}>
+            <select id="tipo-sal" className="dt-input" disabled={guardando} value={tipoMov} onChange={(e) => setTipoMov(e.target.value)}>
               {TIPOS_SALIDA.map((t) => (
                 <option key={t.codigo} value={t.codigo}>{t.codigo} — {t.nombre}</option>
               ))}
@@ -131,6 +139,7 @@ export default function Salidas() {
               id="fecha-sal" type="date" className="dt-input"
               min={limites.min} max={limites.max}
               value={fecha}
+              disabled={guardando}
               onChange={(e) => setFecha(e.target.value)}
               required
             />
@@ -141,6 +150,7 @@ export default function Salidas() {
             <select
               id="proveedor-sal" className="dt-input"
               value={proveedor?.id_proveedor ?? ''}
+              disabled={guardando}
               onChange={(e) => setProveedor(proveedores.find((p) => p.id_proveedor === e.target.value) ?? null)}
             >
               <option value="">Sin proveedor asociado</option>
@@ -152,14 +162,14 @@ export default function Salidas() {
 
           <div className="md:col-span-2">
             <label className="dt-label" htmlFor="conc-sal">Concepto</label>
-            <input id="conc-sal" className="dt-input" value={concepto} onChange={(e) => setConcepto(e.target.value)} placeholder="Despacho a tienda…" />
+            <input id="conc-sal" className="dt-input" value={concepto} disabled={guardando} onChange={(e) => setConcepto(e.target.value)} placeholder="Despacho a tienda…" />
           </div>
         </div>
 
         <div className="costura my-6" />
 
         <label className="dt-label">Agregar artículo a la salida</label>
-        <BuscadorProducto onSeleccion={agregarLinea} inputRef={buscadorRef} autoFocus placeholder="Busque un artículo y presione Enter para agregarlo…" />
+        <BuscadorProducto onSeleccion={agregarLinea} inputRef={buscadorRef} autoFocus disabled={guardando} placeholder="Busque un artículo y presione Enter para agregarlo…" />
 
         <div className="mt-4 space-y-2.5">
           {lineas.length === 0 && (
@@ -179,15 +189,16 @@ export default function Salidas() {
                 </div>
                 <input
                   type="number" min="0.01" step="0.01" inputMode="decimal" placeholder="Cantidad"
-                  value={l.cantidad} onChange={(e) => actualizarCantidad(l.clave, e.target.value)}
+                  value={l.cantidad} disabled={guardando} onChange={(e) => actualizarCantidad(l.clave, e.target.value)}
                   className={`dt-input text-right font-mono ${excede ? '!border-red-400 !ring-4 !ring-red-500/10' : ''}`}
                   aria-invalid={excede}
                 />
                 <input className="dt-input text-right font-mono" readOnly value={moneda(l.producto.costo_promedio_ponderado)} />
                 <button
                   type="button"
-                  className="justify-self-end rounded-lg p-1.5 text-pizarra-300 transition hover:bg-borgona-50 hover:text-borgona-600"
+                  className="justify-self-end rounded-lg p-1.5 text-pizarra-300 transition hover:bg-borgona-50 hover:text-borgona-600 disabled:opacity-30"
                   onClick={() => quitarLinea(l.clave)}
+                  disabled={guardando}
                   aria-label={`Quitar ${l.producto.nombre}`}
                 >
                   <Trash2 size={16} />
@@ -209,7 +220,7 @@ export default function Salidas() {
             <p className="text-[28px] font-extrabold tabular-nums text-pizarra-800">{moneda(total)}</p>
           </div>
           <div className="flex gap-3">
-            <button type="button" className="dt-btn dt-btn-ghost" onClick={limpiar}>
+            <button type="button" className="dt-btn dt-btn-ghost" onClick={limpiarManual} disabled={guardando}>
               <Eraser size={17} /> Limpiar
             </button>
             <button type="submit" className="dt-btn dt-btn-primary" disabled={guardando || algunaExcede || !esOperativo}>

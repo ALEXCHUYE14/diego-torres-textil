@@ -61,6 +61,17 @@ export default function Entradas() {
     buscadorRef.current?.focus();
   };
 
+  // Distinto del reseteo automático post-guardado: el usuario pulsa esto
+  // explícitamente para empezar un documento nuevo, así que además debe
+  // ocultar el aviso "guardada con éxito · Documento N" del envío anterior
+  // (si no, ese banner y su botón de imprimir quedan visibles mientras se
+  // llena una entrada distinta, arriesgando que se imprima el documento
+  // equivocado).
+  const limpiarManual = () => {
+    setDocumentoGuardado(null);
+    limpiar();
+  };
+
   const guardar = async (e: FormEvent) => {
     e.preventDefault();
     setDocumentoGuardado(null);
@@ -119,7 +130,7 @@ export default function Entradas() {
         <div className="grid gap-5 md:grid-cols-2">
           <div>
             <label className="dt-label" htmlFor="tipo-mov">Tipo de movimiento</label>
-            <select id="tipo-mov" className="dt-input" value={tipoMov} onChange={(e) => setTipoMov(e.target.value)}>
+            <select id="tipo-mov" className="dt-input" disabled={guardando} value={tipoMov} onChange={(e) => setTipoMov(e.target.value)}>
               {TIPOS_ENTRADA.map((t) => (
                 <option key={t.codigo} value={t.codigo}>{t.codigo} — {t.nombre}</option>
               ))}
@@ -132,6 +143,7 @@ export default function Entradas() {
               id="fecha" type="date" className="dt-input"
               min={limites.min} max={limites.max}
               value={fecha}
+              disabled={guardando}
               onChange={(e) => setFecha(e.target.value)}
               required
             />
@@ -142,6 +154,7 @@ export default function Entradas() {
             <select
               id="proveedor" className="dt-input"
               value={proveedor?.id_proveedor ?? ''}
+              disabled={guardando}
               onChange={(e) => setProveedor(proveedores.find((p) => p.id_proveedor === e.target.value) ?? null)}
               required
             >
@@ -154,23 +167,23 @@ export default function Entradas() {
 
           <div>
             <label className="dt-label" htmlFor="factura">N° Factura</label>
-            <input id="factura" className="dt-input font-mono" value={nroFactura} onChange={(e) => setNroFactura(e.target.value)} placeholder="F001-000123" />
+            <input id="factura" className="dt-input font-mono" value={nroFactura} disabled={guardando} onChange={(e) => setNroFactura(e.target.value)} placeholder="F001-000123" />
           </div>
           <div>
             <label className="dt-label" htmlFor="orden">N° Orden Compra</label>
-            <input id="orden" className="dt-input font-mono" value={nroOrden} onChange={(e) => setNroOrden(e.target.value)} placeholder="OC-2026-045" />
+            <input id="orden" className="dt-input font-mono" value={nroOrden} disabled={guardando} onChange={(e) => setNroOrden(e.target.value)} placeholder="OC-2026-045" />
           </div>
 
           <div className="md:col-span-2">
             <label className="dt-label" htmlFor="concepto">Concepto</label>
-            <input id="concepto" className="dt-input" value={concepto} onChange={(e) => setConcepto(e.target.value)} placeholder="Reposición de temporada…" />
+            <input id="concepto" className="dt-input" value={concepto} disabled={guardando} onChange={(e) => setConcepto(e.target.value)} placeholder="Reposición de temporada…" />
           </div>
         </div>
 
         <div className="costura my-6" />
 
         <label className="dt-label">Agregar artículo a la entrada</label>
-        <BuscadorProducto onSeleccion={agregarLinea} inputRef={buscadorRef} autoFocus placeholder="Busque un artículo y presione Enter para agregarlo…" />
+        <BuscadorProducto onSeleccion={agregarLinea} inputRef={buscadorRef} autoFocus disabled={guardando} placeholder="Busque un artículo y presione Enter para agregarlo…" />
 
         <div className="mt-4 space-y-2.5">
           {lineas.length === 0 && (
@@ -186,18 +199,19 @@ export default function Entradas() {
               </div>
               <input
                 type="number" min="0.01" step="0.01" inputMode="decimal" placeholder="Cantidad"
-                value={l.cantidad} onChange={(e) => actualizarLinea(l.clave, 'cantidad', e.target.value)}
+                value={l.cantidad} disabled={guardando} onChange={(e) => actualizarLinea(l.clave, 'cantidad', e.target.value)}
                 className="dt-input text-right font-mono"
               />
               <input
                 type="number" min="0" step="0.01" inputMode="decimal" placeholder="Valor unit."
-                value={l.valorUnitario} onChange={(e) => actualizarLinea(l.clave, 'valorUnitario', e.target.value)}
+                value={l.valorUnitario} disabled={guardando} onChange={(e) => actualizarLinea(l.clave, 'valorUnitario', e.target.value)}
                 className="dt-input text-right font-mono"
               />
               <button
                 type="button"
-                className="justify-self-end rounded-lg p-1.5 text-pizarra-300 transition hover:bg-borgona-50 hover:text-borgona-600"
+                className="justify-self-end rounded-lg p-1.5 text-pizarra-300 transition hover:bg-borgona-50 hover:text-borgona-600 disabled:opacity-30"
                 onClick={() => quitarLinea(l.clave)}
+                disabled={guardando}
                 aria-label={`Quitar ${l.producto.nombre}`}
               >
                 <Trash2 size={16} />
@@ -213,7 +227,7 @@ export default function Entradas() {
             <p className="text-[28px] font-extrabold tabular-nums text-pizarra-800">{moneda(total)}</p>
           </div>
           <div className="flex gap-3">
-            <button type="button" className="dt-btn dt-btn-ghost" onClick={limpiar}>
+            <button type="button" className="dt-btn dt-btn-ghost" onClick={limpiarManual} disabled={guardando}>
               <Eraser size={17} /> Limpiar
             </button>
             <button type="submit" className="dt-btn dt-btn-primary" disabled={guardando || !esOperativo}>

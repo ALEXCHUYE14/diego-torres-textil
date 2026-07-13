@@ -37,6 +37,7 @@ function ListaSimple({
   const [nuevo, setNuevo] = useState('');
   const [guardando, setGuardando] = useState(false);
   const [aEliminar, setAEliminar] = useState<FilaSimple | null>(null);
+  const [eliminando, setEliminando] = useState(false);
 
   const cargar = async () => {
     try {
@@ -74,6 +75,7 @@ function ListaSimple({
 
   const eliminar = async () => {
     if (!aEliminar) return;
+    setEliminando(true);
     try {
       const { error } = await supabase.from(tabla).delete().eq(idCampo, aEliminar.id);
       if (error) { toast('error', error.message); return; }
@@ -82,6 +84,7 @@ function ListaSimple({
     } catch {
       toast('error', 'Error de red al eliminar. Verifique su conexión.');
     } finally {
+      setEliminando(false);
       setAEliminar(null);
     }
   };
@@ -135,6 +138,8 @@ function ListaSimple({
         mensaje="Esta opción dejará de aparecer en los selectores de artículos nuevos. Los artículos que ya la usan no se modifican."
         onConfirmar={eliminar}
         onCancelar={() => setAEliminar(null)}
+        textoConfirmar={eliminando ? 'Eliminando…' : 'Eliminar'}
+        deshabilitado={eliminando}
       />
     </div>
   );
@@ -154,6 +159,7 @@ function GestionProveedores() {
   const [telefono, setTelefono] = useState('');
   const [guardando, setGuardando] = useState(false);
   const [aEliminar, setAEliminar] = useState<Proveedor | null>(null);
+  const [eliminando, setEliminando] = useState(false);
 
   const cargar = async () => {
     try {
@@ -203,6 +209,7 @@ function GestionProveedores() {
 
   const eliminar = async () => {
     if (!aEliminar) return;
+    setEliminando(true);
     try {
       const { error } = await supabase.from('terceros').delete().eq('id_proveedor', aEliminar.id_proveedor);
       if (error) {
@@ -216,6 +223,7 @@ function GestionProveedores() {
     } catch {
       toast('error', 'Error de red al eliminar. Verifique su conexión.');
     } finally {
+      setEliminando(false);
       setAEliminar(null);
     }
   };
@@ -291,6 +299,8 @@ function GestionProveedores() {
         mensaje={`¿Está seguro de que desea eliminar a "${aEliminar?.razon_social ?? ''}"?`}
         onConfirmar={eliminar}
         onCancelar={() => setAEliminar(null)}
+        textoConfirmar={eliminando ? 'Eliminando…' : 'Eliminar'}
+        deshabilitado={eliminando}
       />
     </div>
   );
@@ -310,6 +320,7 @@ function GestionFamilias() {
   const [nombre, setNombre] = useState('');
   const [guardando, setGuardando] = useState(false);
   const [aEliminar, setAEliminar] = useState<Familia | null>(null);
+  const [eliminando, setEliminando] = useState(false);
 
   const cargar = async () => {
     try {
@@ -334,7 +345,7 @@ function GestionFamilias() {
       const payload = { codigo: codigo.trim(), nombre: nombre.trim().toUpperCase() };
       const { error } = editando
         ? await supabase.from('familias').update(payload).eq('id_familia', editando.id_familia)
-        : await supabase.from('familias').insert({ ...payload, consecutivo_familia: 0 });
+        : await supabase.from('familias').insert(payload);
       if (error) {
         toast('error', error.code === '23505' ? `Ya existe una familia con el código "${codigo.trim()}"` : error.message);
         return;
@@ -351,6 +362,7 @@ function GestionFamilias() {
 
   const eliminar = async () => {
     if (!aEliminar) return;
+    setEliminando(true);
     try {
       const { error } = await supabase.from('familias').delete().eq('id_familia', aEliminar.id_familia);
       if (error) {
@@ -364,6 +376,7 @@ function GestionFamilias() {
     } catch {
       toast('error', 'Error de red al eliminar. Verifique su conexión.');
     } finally {
+      setEliminando(false);
       setAEliminar(null);
     }
   };
@@ -428,6 +441,8 @@ function GestionFamilias() {
         mensaje={`¿Está seguro de que desea eliminar "${aEliminar?.nombre ?? ''}"? Solo es posible si no tiene artículos codificados.`}
         onConfirmar={eliminar}
         onCancelar={() => setAEliminar(null)}
+        textoConfirmar={eliminando ? 'Eliminando…' : 'Eliminar'}
+        deshabilitado={eliminando}
       />
     </div>
   );

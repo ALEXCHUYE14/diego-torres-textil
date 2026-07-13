@@ -38,6 +38,24 @@ function normalizarClave(clave: string): string {
   return clave.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 }
 
+// A diferencia de un simple `.replace(',', '.')`, esto sí entiende números
+// con separador de miles (formato natural al escribir plata en Colombia,
+// ej. "38.500" o "1.200.000"). Trata el último punto/coma como separador
+// decimal SOLO si le siguen 1 o 2 dígitos (formato de centavos); cualquier
+// otro punto/coma se interpreta como separador de miles y se descarta. Sin
+// esto, "38.500" se leía como 38.5 — corrupción silenciosa del valor
+// inicial/saldo cargado.
+function parsearNumero(textoOriginal: string): number {
+  const texto = textoOriginal.trim();
+  if (!texto) return 0;
+  const match = texto.match(/[.,](\d{1,2})$/);
+  if (match) {
+    const enteros = texto.slice(0, texto.length - match[0].length).replace(/[.,]/g, '');
+    return parseFloat(`${enteros}.${match[1]}`);
+  }
+  return parseFloat(texto.replace(/[.,]/g, ''));
+}
+
 function descargarPlantilla() {
   const encabezado = 'codigo,familia,nombre,genero,color,talla,saldo_inicial,valor_inicial\n';
   const ejemplo1 = 'BAT-001,BATA,BATA CLINICA,UNISEX,BLANCO,M,25,38500\n';
@@ -82,6 +100,12 @@ export default function ImportadorCatalogo({
   };
 
   const cerrar = () => {
+    // Cerrar mientras `importar()` sigue corriendo en segundo plano dejaba
+    // el estado obsoleto: la importación seguía escribiendo en Supabase, y
+    // al terminar volcaba su resultado sobre un modal ya "reiniciado" (o
+    // reabierto para un archivo distinto), mostrando resultados de una
+    // sesión de importación que el usuario ya había abandonado.
+    if (importando) return;
     setAbierto(false);
     reiniciar();
   };
@@ -138,12 +162,12 @@ export default function ImportadorCatalogo({
           return;
         }
 
-        const saldoInicial = parseFloat(saldoTexto.replace(',', '.'));
+        const saldoInicial = parsearNumero(saldoTexto);
         if (isNaN(saldoInicial) || saldoInicial < 0) {
           malas.push({ fila: numFila, motivo: `Saldo inicial inválido "${saldoTexto}"` });
           return;
         }
-        const valorInicial = parseFloat(valorTexto.replace(',', '.'));
+        const valorInicial = parsearNumero(valorTexto);
         if (isNaN(valorInicial) || valorInicial < 0) {
           malas.push({ fila: numFila, motivo: `Valor inicial inválido "${valorTexto}"` });
           return;
@@ -225,7 +249,7 @@ export default function ImportadorCatalogo({
           <h3 className="flex items-center gap-2 text-[17px] font-bold text-pizarra-800">
             <FileSpreadsheet size={19} className="text-indigo-600" /> Carga masiva de catálogo
           </h3>
-          <button onClick={cerrar} className="rounded-lg p-1.5 text-pizarra-400 hover:bg-pizarra-100 hover:text-pizarra-700 transition" aria-label="Cerrar">
+          <button onClick={cerrar} disabled={importando} className="rounded-lg p-1.5 text-pizarra-400 hover:bg-pizarra-100 hover:text-pizarra-700 transition disabled:opacity-30" aria-label="Cerrar">
             <X size={18} />
           </button>
         </div>
@@ -293,7 +317,7 @@ export default function ImportadorCatalogo({
         )}
 
         <div className="mt-5 flex justify-end gap-3">
-          <button type="button" className="dt-btn dt-btn-ghost" onClick={cerrar}>Cerrar</button>
+          <button type="button" className="dt-btn dt-btn-ghost" onClick={cerrar} disabled={importando}>Cerrar</button>
           <button type="button" className="dt-btn dt-btn-primary" disabled={validas.length === 0 || importando || deshabilitado} onClick={importar}>
             <Upload size={16} /> {importando ? 'Importando…' : `Importar ${validas.length || ''} artículo(s)`}
           </button>
