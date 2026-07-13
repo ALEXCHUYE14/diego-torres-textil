@@ -22,13 +22,13 @@
 --  ejecutes este script — pídeme en su lugar un borrado selectivo.
 -- ============================================================================
 
-delete from venta_items;
-delete from ventas;
-delete from historial_movimientos;
-delete from productos;
+delete from venta_items where true;
+delete from ventas where true;
+delete from historial_movimientos where true;
+delete from productos where true;
 
 update consecutivos set ultimo = 0 where tipo in ('ENT', 'SAL', 'TCK');
-update familias set consecutivo_familia = 0;
+update familias set consecutivo_familia = 0 where true;
 
 -- ============================================================================
 -- Fin del reinicio. El catálogo de artículos y el kardex quedan vacíos.
