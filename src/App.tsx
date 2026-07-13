@@ -39,8 +39,12 @@ function Rutas() {
         <Route path="/salidas" element={
           <RutaProtegida rolesPermitidos={['operativo', 'administrador']}><Salidas /></RutaProtegida>
         } />
-        <Route path="/articulos" element={<Articulos />} />
-        <Route path="/catalogos" element={<Catalogos />} />
+        <Route path="/articulos" element={
+          <RutaProtegida rolesPermitidos={['operativo', 'administrador']}><Articulos /></RutaProtegida>
+        } />
+        <Route path="/catalogos" element={
+          <RutaProtegida rolesPermitidos={['administrador']}><Catalogos /></RutaProtegida>
+        } />
         <Route path="/kardex" element={<Kardex />} />
         <Route path="/usuarios" element={
           <RutaProtegida rolesPermitidos={['administrador']}><Usuarios /></RutaProtegida>

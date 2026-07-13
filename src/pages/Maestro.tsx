@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Search } from 'lucide-react';
+import { Download, Search } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useToast } from '../context/ToastContext';
 import { DataTable, PageHeader } from '../components/ui';
@@ -51,9 +51,50 @@ export default function Maestro() {
     });
   }, [productos, busqueda, nombreFamilia]);
 
+  // Exporta exactamente lo que está en pantalla (respeta la búsqueda activa):
+  // si hay un filtro escrito, descarga solo esas filas; si no, descarga todo
+  // el catálogo. Valores numéricos sin formatear (sin "S/" ni separadores de
+  // miles) para que Excel/Sheets los reconozca como números, no como texto.
+  const descargarCSV = () => {
+    const encabezados = ['Código', 'Nombre', 'Género', 'Color', 'Talla', 'Familia', 'Stock', 'CPP', 'Precio venta', 'Estado'];
+    const escapar = (valor: string) => `"${valor.replace(/"/g, '""')}"`;
+    const filas = filtrados.map((p) => [
+      p.codigo_barra,
+      p.nombre,
+      p.genero ?? '',
+      p.color ?? '',
+      p.talla ?? '',
+      nombreFamilia(p.id_familia),
+      p.stock_real,
+      p.costo_promedio_ponderado,
+      p.precio_venta,
+      p.activo ? 'Activo' : 'Inactivo',
+    ].map((campo) => escapar(String(campo))).join(','));
+
+    const csv = [encabezados.map(escapar).join(','), ...filas].join('\r\n');
+    // BOM al inicio: sin esto, Excel abre acentos/ñ como caracteres corruptos.
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const enlace = document.createElement('a');
+    enlace.href = url;
+    enlace.download = `maestro-productos-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(enlace);
+    enlace.click();
+    document.body.removeChild(enlace);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div>
-      <PageHeader titulo="Maestro de productos" subtitulo="Listado completo del catálogo · consulta rápida por nombre, código, familia, color o talla" />
+      <PageHeader
+        titulo="Maestro de productos"
+        subtitulo="Listado completo del catálogo · consulta rápida por nombre, código, familia, color o talla"
+        extra={
+          <button className="dt-btn dt-btn-ghost" onClick={descargarCSV} disabled={cargando || filtrados.length === 0}>
+            <Download size={16} /> Descargar CSV
+          </button>
+        }
+      />
 
       <div className="dt-card p-5 md:p-6">
         <div className="relative">

@@ -13,19 +13,24 @@ export default function Layout({ children }: { children: ReactNode }) {
   const [printAbierto, setPrintAbierto] = useState(false);
   const { nombre, rol, esOperativo, esAdministrador, salir } = useAuth();
 
-  // El menú se arma según el rol: Entradas/Salidas solo si puede registrar
-  // movimientos, Usuarios solo para Administrador. No basta con ocultar el
-  // link — la ruta también está protegida (ver RutaProtegida en App.tsx)
-  // para que escribir la URL a mano no sirva de nada.
+  // El menú se arma según el rol:
+  //  - Informe, Maestro y Kardex: los 3 roles (Administrador, Operativo/
+  //    Almacén y Consulta).
+  //  - Entradas, Salidas, Artículos e Imprimir: Operativo/Almacén y
+  //    Administrador.
+  //  - Catálogos y Usuarios: exclusivos de Administrador.
+  // No basta con ocultar el link — la ruta también está protegida (ver
+  // RutaProtegida en App.tsx) para que escribir la URL a mano no sirva de
+  // nada.
   const nav = [
     { a: '/', icono: LayoutDashboard, texto: 'Informe' },
     { a: '/maestro', icono: PackageSearch, texto: 'Maestro' },
     ...(esOperativo ? [
       { a: '/entradas', icono: ArrowDownToLine, texto: 'Entradas' },
       { a: '/salidas', icono: ArrowUpFromLine, texto: 'Salidas' },
+      { a: '/articulos', icono: ScanBarcode, texto: 'Artículos' },
     ] : []),
-    { a: '/articulos', icono: ScanBarcode, texto: 'Artículos' },
-    { a: '/catalogos', icono: LibraryBig, texto: 'Catálogos' },
+    ...(esAdministrador ? [{ a: '/catalogos', icono: LibraryBig, texto: 'Catálogos' }] : []),
     { a: '/kardex', icono: Search, texto: 'Kardex' },
     ...(esAdministrador ? [{ a: '/usuarios', icono: Users, texto: 'Usuarios' }] : []),
   ];
@@ -34,7 +39,7 @@ export default function Layout({ children }: { children: ReactNode }) {
   // "grid-cols-" + n dinámicamente), por eso el mapa explícito en vez de
   // una plantilla de string.
   const COLS_MOVIL: Record<number, string> = {
-    4: 'grid-cols-4', 5: 'grid-cols-5', 6: 'grid-cols-6', 7: 'grid-cols-7', 8: 'grid-cols-8',
+    3: 'grid-cols-3', 4: 'grid-cols-4', 5: 'grid-cols-5', 6: 'grid-cols-6', 7: 'grid-cols-7', 8: 'grid-cols-8',
   };
   const colsMovil = COLS_MOVIL[nav.length] ?? 'grid-cols-7';
 
@@ -73,14 +78,16 @@ export default function Layout({ children }: { children: ReactNode }) {
               {!colapsado && texto}
             </NavLink>
           ))}
-          <button
-            onClick={() => setPrintAbierto(true)}
-            className="flex w-full items-center gap-3 rounded-[10px] px-3 py-2.5 text-[14px] font-medium transition hover:bg-white/5 hover:text-white"
-            title="Imprimir documentos"
-          >
-            <Printer size={19} className="shrink-0" />
-            {!colapsado && 'Imprimir'}
-          </button>
+          {esOperativo && (
+            <button
+              onClick={() => setPrintAbierto(true)}
+              className="flex w-full items-center gap-3 rounded-[10px] px-3 py-2.5 text-[14px] font-medium transition hover:bg-white/5 hover:text-white"
+              title="Imprimir documentos"
+            >
+              <Printer size={19} className="shrink-0" />
+              {!colapsado && 'Imprimir'}
+            </button>
+          )}
         </nav>
 
         <div className="border-t border-white/10 px-2.5 py-3 space-y-1">
@@ -112,9 +119,11 @@ export default function Layout({ children }: { children: ReactNode }) {
           <span className="truncate text-[15px] font-bold tracking-wide">Comercializadora T&amp;E</span>
         </div>
         <div className="flex items-center gap-1">
-          <button onClick={() => setPrintAbierto(true)} className="rounded-lg p-2 hover:bg-white/10 transition" aria-label="Imprimir documentos">
-            <Printer size={19} />
-          </button>
+          {esOperativo && (
+            <button onClick={() => setPrintAbierto(true)} className="rounded-lg p-2 hover:bg-white/10 transition" aria-label="Imprimir documentos">
+              <Printer size={19} />
+            </button>
+          )}
           <button onClick={salir} className="rounded-lg p-2 hover:bg-white/10 transition" aria-label="Cerrar sesión">
             <LogOut size={19} />
           </button>
