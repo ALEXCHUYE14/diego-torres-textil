@@ -5,6 +5,7 @@ import Layout from './components/Layout';
 import RutaProtegida from './components/RutaProtegida';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
+import Maestro from './pages/Maestro';
 import Entradas from './pages/Entradas';
 import Salidas from './pages/Salidas';
 import Articulos from './pages/Articulos';
@@ -31,6 +32,7 @@ function Rutas() {
     <Layout>
       <Routes>
         <Route path="/" element={<Dashboard />} />
+        <Route path="/maestro" element={<Maestro />} />
         <Route path="/entradas" element={
           <RutaProtegida rolesPermitidos={['operativo', 'administrador']}><Entradas /></RutaProtegida>
         } />

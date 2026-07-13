@@ -2,7 +2,7 @@ import { ReactNode, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import {
   ArrowDownToLine, ArrowUpFromLine, LayoutDashboard, LibraryBig, LogOut,
-  PanelLeftClose, PanelLeftOpen, Printer, ScanBarcode, Search, Users,
+  PackageSearch, PanelLeftClose, PanelLeftOpen, Printer, ScanBarcode, Search, Users,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { etiquetaRol } from '../lib/types';
@@ -19,6 +19,7 @@ export default function Layout({ children }: { children: ReactNode }) {
   // para que escribir la URL a mano no sirva de nada.
   const nav = [
     { a: '/', icono: LayoutDashboard, texto: 'Informe' },
+    { a: '/maestro', icono: PackageSearch, texto: 'Maestro' },
     ...(esOperativo ? [
       { a: '/entradas', icono: ArrowDownToLine, texto: 'Entradas' },
       { a: '/salidas', icono: ArrowUpFromLine, texto: 'Salidas' },
@@ -29,7 +30,13 @@ export default function Layout({ children }: { children: ReactNode }) {
     ...(esAdministrador ? [{ a: '/usuarios', icono: Users, texto: 'Usuarios' }] : []),
   ];
 
-  const colsMovil = nav.length >= 7 ? 'grid-cols-7' : nav.length === 6 ? 'grid-cols-6' : 'grid-cols-4';
+  // Tailwind JIT necesita las clases literales (no puede construir
+  // "grid-cols-" + n dinámicamente), por eso el mapa explícito en vez de
+  // una plantilla de string.
+  const COLS_MOVIL: Record<number, string> = {
+    4: 'grid-cols-4', 5: 'grid-cols-5', 6: 'grid-cols-6', 7: 'grid-cols-7', 8: 'grid-cols-8',
+  };
+  const colsMovil = COLS_MOVIL[nav.length] ?? 'grid-cols-7';
 
   return (
     <div className="min-h-screen">
