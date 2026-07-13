@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Pencil, Plus, Power, PowerOff, Save, Trash2 } from 'lucide-react';
+import { AlertTriangle, Pencil, Plus, Power, PowerOff, Save, Trash2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -31,6 +31,9 @@ export default function Articulos() {
   const [guardando, setGuardando] = useState(false);
   const [cambiandoEstado, setCambiandoEstado] = useState(false);
   const [destacadoId, setDestacadoId] = useState<string | null>(null);
+  const [purgaAbierta, setPurgaAbierta] = useState(false);
+  const [purgaTexto, setPurgaTexto] = useState('');
+  const [purgando, setPurgando] = useState(false);
 
   const familia = familias.find((f) => f.id_familia === idFamilia) ?? null;
 
@@ -207,12 +210,46 @@ export default function Articulos() {
     }
   };
 
+  // Borrado total del catálogo (artículos + su historial de movimientos y
+  // ventas). Exclusivo de Administrador, verificado también en el servidor
+  // (rpc_purgar_catalogo). Requiere escribir "ELIMINAR" para habilitar el
+  // botón de confirmación — es irreversible y de alto impacto, por eso no
+  // basta con el modal de confirmación estándar de dos botones.
+  const purgarCatalogo = async () => {
+    setPurgando(true);
+    try {
+      const { data, error } = await supabase.rpc('rpc_purgar_catalogo');
+      if (error) { toast('error', error.message); return; }
+      toast('exito', `Catálogo eliminado: ${data.articulos_eliminados} artículo(s) y ${data.movimientos_eliminados} movimiento(s) borrados`);
+      setPurgaAbierta(false);
+      setPurgaTexto('');
+      await cargar();
+    } catch {
+      toast('error', 'Error de red al eliminar el catálogo. Verifique su conexión.');
+    } finally {
+      setPurgando(false);
+    }
+  };
+
   return (
     <div>
       <PageHeader
         titulo="Codificación de artículos"
         subtitulo="El código se compone en vivo: Familia · Consecutivo · Nombre · (Género · Color · Talla si aplican)"
-        extra={<ImportadorCatalogo familias={familias} deshabilitado={!esOperativo} onCompletado={cargar} />}
+        extra={
+          <div className="flex flex-wrap items-center gap-3">
+            <ImportadorCatalogo familias={familias} deshabilitado={!esOperativo} onCompletado={cargar} />
+            {esAdministrador && (
+              <button
+                className="dt-btn dt-btn-ghost !text-borgona-600 hover:!bg-borgona-50"
+                disabled={productos.length === 0}
+                onClick={() => setPurgaAbierta(true)}
+              >
+                <AlertTriangle size={16} /> Eliminar todo el catálogo
+              </button>
+            )}
+          </div>
+        }
       />
 
       <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
@@ -374,6 +411,53 @@ export default function Articulos() {
         textoConfirmar={cambiandoEstado ? 'Desactivando…' : 'Desactivar'}
         deshabilitado={cambiandoEstado}
       />
+
+      {/* Confirmación por texto: acción irreversible de alto impacto, no
+          alcanza con el modal estándar de dos botones. */}
+      {purgaAbierta && (
+        <div
+          className="fixed inset-0 z-[80] flex items-end md:items-center justify-center bg-pizarra-900/40 backdrop-blur-[2px] p-4 print:hidden"
+          onClick={() => { if (!purgando) { setPurgaAbierta(false); setPurgaTexto(''); } }}
+        >
+          <div className="modal-enter dt-card w-full max-w-md p-6" role="alertdialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-borgona-50 text-borgona-600">
+              <AlertTriangle size={22} />
+            </div>
+            <h3 className="text-center text-[17px] font-bold text-pizarra-800">Eliminar todo el catálogo</h3>
+            <p className="mt-2 text-center text-[14px] leading-relaxed text-pizarra-500">
+              Esto borra PERMANENTEMENTE los {productos.length} artículo(s) del catálogo junto con todo su historial de
+              movimientos y ventas. Los consecutivos de Entradas, Salidas y Tickets vuelven a 0. No se puede deshacer.
+            </p>
+            <p className="mt-4 text-center text-[13px] font-semibold text-pizarra-700">
+              Escriba <span className="font-mono text-borgona-600">ELIMINAR</span> para confirmar
+            </p>
+            <input
+              className="dt-input mt-2 text-center uppercase"
+              value={purgaTexto}
+              onChange={(e) => setPurgaTexto(e.target.value)}
+              disabled={purgando}
+              autoFocus
+              aria-label="Escriba ELIMINAR para confirmar"
+            />
+            <div className="mt-6 grid grid-cols-2 gap-3">
+              <button
+                className="dt-btn dt-btn-ghost"
+                onClick={() => { setPurgaAbierta(false); setPurgaTexto(''); }}
+                disabled={purgando}
+              >
+                Cancelar
+              </button>
+              <button
+                className="dt-btn dt-btn-danger"
+                onClick={purgarCatalogo}
+                disabled={purgando || purgaTexto.trim().toUpperCase() !== 'ELIMINAR'}
+              >
+                {purgando ? 'Eliminando…' : 'Eliminar todo'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
