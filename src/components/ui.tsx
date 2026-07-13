@@ -8,7 +8,7 @@ import { numero } from '../utils/format';
    Modal de confirmación elegante (Eliminar, acciones críticas)
    ============================================================ */
 export function ConfirmModal({
-  abierto, titulo, mensaje, onConfirmar, onCancelar, textoConfirmar = 'Eliminar',
+  abierto, titulo, mensaje, onConfirmar, onCancelar, textoConfirmar = 'Eliminar', deshabilitado = false,
 }: {
   abierto: boolean;
   titulo: string;
@@ -16,6 +16,7 @@ export function ConfirmModal({
   onConfirmar: () => void;
   onCancelar: () => void;
   textoConfirmar?: string;
+  deshabilitado?: boolean;
 }) {
   useEffect(() => {
     if (!abierto) return;
@@ -34,8 +35,8 @@ export function ConfirmModal({
         <h3 className="text-center text-[17px] font-bold text-pizarra-800">{titulo}</h3>
         <p className="mt-2 text-center text-[14px] leading-relaxed text-pizarra-500">{mensaje}</p>
         <div className="mt-6 grid grid-cols-2 gap-3">
-          <button className="dt-btn dt-btn-ghost" onClick={onCancelar} autoFocus>Cancelar</button>
-          <button className="dt-btn dt-btn-danger" onClick={onConfirmar}>{textoConfirmar}</button>
+          <button className="dt-btn dt-btn-ghost" onClick={onCancelar} disabled={deshabilitado} autoFocus>Cancelar</button>
+          <button className="dt-btn dt-btn-danger" onClick={onConfirmar} disabled={deshabilitado}>{textoConfirmar}</button>
         </div>
       </div>
     </div>

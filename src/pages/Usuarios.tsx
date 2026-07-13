@@ -1,9 +1,9 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { UserPlus } from 'lucide-react';
+import { Trash2, UserPlus } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { PageHeader } from '../components/ui';
+import { ConfirmModal, PageHeader } from '../components/ui';
 import { etiquetaRol, ROLES_ASIGNABLES, Rol, Usuario } from '../lib/types';
 
 export default function Usuarios() {
@@ -18,6 +18,8 @@ export default function Usuarios() {
   const [rol, setRol] = useState<Rol>('operativo');
   const [creando, setCreando] = useState(false);
   const [guardandoRolId, setGuardandoRolId] = useState<string | null>(null);
+  const [aEliminar, setAEliminar] = useState<Usuario | null>(null);
+  const [eliminando, setEliminando] = useState(false);
 
   const cargar = async () => {
     setCargandoLista(true);
@@ -81,6 +83,33 @@ export default function Usuarios() {
     }
   };
 
+  const eliminar = async () => {
+    if (!aEliminar) return;
+    setEliminando(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('eliminar-usuario', {
+        body: { id_usuario: aEliminar.id_usuario },
+      });
+      if (error) {
+        let mensaje = error.message || 'No se pudo eliminar el usuario';
+        try {
+          const cuerpo = await (error as { context?: Response }).context?.json?.();
+          if (cuerpo?.error) mensaje = cuerpo.error;
+        } catch { /* se conserva el mensaje genérico */ }
+        toast('error', mensaje);
+        return;
+      }
+      if (data?.error) { toast('error', data.error); return; }
+      toast('exito', `Usuario ${aEliminar.nombre} eliminado`);
+      cargar();
+    } catch {
+      toast('error', 'Error de red al eliminar el usuario. Verifique su conexión — recuerde que la función eliminar-usuario debe estar desplegada en Supabase.');
+    } finally {
+      setEliminando(false);
+      setAEliminar(null);
+    }
+  };
+
   return (
     <div>
       <PageHeader titulo="Gestión de usuarios" subtitulo="Crear cuentas y asignar roles · exclusivo para Administrador" />
@@ -138,17 +167,28 @@ export default function Usuarios() {
                       </p>
                       <p className="truncate text-[12.5px] text-pizarra-500">{u.correo ?? '—'}</p>
                     </div>
-                    <select
-                      className="dt-input !w-auto shrink-0 !py-1.5 !text-[13px]"
-                      value={u.rol}
-                      disabled={guardandoRolId === u.id_usuario || esUnoMismo}
-                      title={esUnoMismo ? 'No puede cambiar su propio rol desde aquí' : undefined}
-                      onChange={(e) => cambiarRol(u, e.target.value as Rol)}
-                    >
-                      <option value="administrador">Administrador</option>
-                      <option value="operativo">Operativo</option>
-                      <option value="consulta">Consulta</option>
-                    </select>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <select
+                        className="dt-input !w-auto !py-1.5 !text-[13px]"
+                        value={u.rol}
+                        disabled={guardandoRolId === u.id_usuario || esUnoMismo}
+                        title={esUnoMismo ? 'No puede cambiar su propio rol desde aquí' : undefined}
+                        onChange={(e) => cambiarRol(u, e.target.value as Rol)}
+                      >
+                        <option value="administrador">Administrador</option>
+                        <option value="operativo">Operativo</option>
+                        <option value="consulta">Consulta</option>
+                      </select>
+                      <button
+                        className="rounded-lg p-1.5 text-pizarra-400 transition hover:bg-borgona-50 hover:text-borgona-600 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-pizarra-400"
+                        disabled={esUnoMismo}
+                        title={esUnoMismo ? 'No puede eliminar su propia cuenta' : `Eliminar a ${u.nombre}`}
+                        aria-label={`Eliminar ${u.nombre}`}
+                        onClick={() => setAEliminar(u)}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </li>
                 );
               })}
@@ -156,6 +196,16 @@ export default function Usuarios() {
           )}
         </div>
       </div>
+
+      <ConfirmModal
+        abierto={aEliminar !== null}
+        titulo="Eliminar usuario"
+        mensaje={`¿Está seguro de que desea eliminar a ${aEliminar?.nombre ?? ''}? Perderá acceso al sistema de inmediato. Si ya tiene movimientos, ventas o cierres de mes registrados a su nombre, el sistema no lo permitirá.`}
+        onConfirmar={eliminar}
+        onCancelar={() => setAEliminar(null)}
+        textoConfirmar={eliminando ? 'Eliminando…' : 'Eliminar'}
+        deshabilitado={eliminando}
+      />
     </div>
   );
 }
