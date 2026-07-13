@@ -41,6 +41,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    // Espera a que getSession() resuelva antes de decidir nada: `session`
+    // arranca en `null` por defecto, igual que cuando de verdad no hay
+    // sesión — sin este guard, este efecto corría en el primer render con
+    // ese `null` todavía sin confirmar, marcaba perfilListo=true de
+    // inmediato (con rol='consulta') y dejaba una ventana de un render
+    // donde `cargando` ya daba false pero el rol real (ej. administrador)
+    // aún no había llegado. En esa ventana, RutaProtegida llegaba a
+    // rechazar rutas que sí debían estar permitidas.
+    if (cargandoSesion) return;
     if (!session) { setRol('consulta'); setNombre(''); setPerfilListo(true); return; }
     // Bandera de cancelación: si la sesión cambia (logout/login rápido de otro
     // usuario) antes de que esta consulta resuelva, se descarta su resultado
@@ -80,7 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // de token aunque sea el mismo usuario, y sin esto se repetía la consulta
     // de rol/nombre innecesariamente en cada refresco.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session?.user.id, toast]);
+  }, [session?.user.id, cargandoSesion, toast]);
 
   const salir = async () => {
     try {
