@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, Pencil, Plus, Power, PowerOff, Save, Trash2 } from 'lucide-react';
+import { AlertTriangle, Pencil, Plus, Power, PowerOff, Save, Search, Trash2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -35,8 +35,24 @@ export default function Articulos() {
   const [purgaAbierta, setPurgaAbierta] = useState(false);
   const [purgaTexto, setPurgaTexto] = useState('');
   const [purgando, setPurgando] = useState(false);
+  const [busqueda, setBusqueda] = useState('');
 
   const familia = familias.find((f) => f.id_familia === idFamilia) ?? null;
+
+  // Con la paginación del catálogo (8 por página) no había forma de
+  // encontrar un artículo puntual sin pasar página por página — en
+  // particular, uno ya desactivado, que sigue apareciendo en la lista pero
+  // puede quedar lejos de la vista. Este filtro busca en todo el catálogo
+  // cargado (activos e inactivos), no solo en la página visible.
+  const productosFiltrados = useMemo(() => {
+    const termino = busqueda.trim().toLowerCase();
+    if (!termino) return productos;
+    return productos.filter((p) =>
+      [p.nombre, p.codigo_barra, p.genero, p.color, p.talla]
+        .filter(Boolean)
+        .some((campo) => campo!.toLowerCase().includes(termino))
+    );
+  }, [productos, busqueda]);
 
   // Composición dinámica en pantalla del código final: genero/color/talla son
   // opcionales, así que se omiten del código si el usuario los deja en blanco.
@@ -368,7 +384,24 @@ export default function Articulos() {
 
       {/* ---------- Catálogo ---------- */}
       <div ref={catalogoRef} className="dt-card mt-6 scroll-mt-6 p-5 md:p-6">
-        <h2 className="mb-4 text-[16px] font-bold text-pizarra-800">Catálogo de artículos</h2>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-[16px] font-bold text-pizarra-800">Catálogo de artículos</h2>
+          <div className="relative w-full sm:w-72">
+            <Search size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-pizarra-400" />
+            <input
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              placeholder="Buscar por nombre, código, color, talla…"
+              className="dt-input !pl-10 !py-2 !text-[13px]"
+              aria-label="Buscar artículo en el catálogo"
+            />
+          </div>
+        </div>
+        {busqueda.trim() && (
+          <p className="mb-3 -mt-2 text-[12px] text-pizarra-400">
+            {productosFiltrados.length} de {productos.length} artículo{productos.length === 1 ? '' : 's'}
+          </p>
+        )}
         <DataTable<Producto & Record<string, unknown>>
           columnas={[
             { clave: 'codigo_barra', titulo: 'Código', render: (p) => <span className="font-mono text-[12.5px] text-indigo-600">{p.codigo_barra}</span> },
@@ -403,9 +436,9 @@ export default function Articulos() {
               </div>
             )},
           ]}
-          filas={productos as Array<Producto & Record<string, unknown>>}
+          filas={productosFiltrados as Array<Producto & Record<string, unknown>>}
           porPagina={8}
-          vacio="Aún no hay artículos codificados"
+          vacio={busqueda.trim() ? 'Sin artículos que coincidan con la búsqueda' : 'Aún no hay artículos codificados'}
           idDeFila={(p) => p.id_producto}
           resaltarId={destacadoId}
         />
