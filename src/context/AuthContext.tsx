@@ -29,7 +29,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [rol, setRol] = useState<Rol>('consulta');
   const [nombre, setNombre] = useState('');
   const [cargandoSesion, setCargandoSesion] = useState(true);
-  const [perfilListo, setPerfilListo] = useState(false);
+  // Id del usuario para el que rol/nombre ya están cargados y son válidos
+  // (null = sesión anónima o perfil aún no cargado). Comparar esto contra
+  // session.user.id — en vez de un simple booleano "perfil listo" — es lo
+  // que permite detectar, en el MISMO render donde `session` cambia de
+  // usuario (ej. justo al iniciar sesión), que el rol todavía no
+  // corresponde a ese usuario. Un booleano aparte solo se corrige en un
+  // efecto que corre DESPUÉS de ese render, dejando una ventana donde
+  // `cargando` ya da false pero `rol` todavía es el de antes de iniciar
+  // sesión ("consulta" por defecto) — exactamente lo que dejaba pasar el
+  // aviso falso de "acceso denegado" al entrar como Administrador.
+  const [perfilCargadoPara, setPerfilCargadoPara] = useState<string | null>(null);
 
   useEffect(() => {
     supabase.auth.getSession()
@@ -47,21 +57,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    // Espera a que getSession() resuelva antes de decidir nada: `session`
-    // arranca en `null` por defecto, igual que cuando de verdad no hay
-    // sesión — sin este guard, este efecto corría en el primer render con
-    // ese `null` todavía sin confirmar, marcaba perfilListo=true de
-    // inmediato (con rol='consulta') y dejaba una ventana de un render
-    // donde `cargando` ya daba false pero el rol real (ej. administrador)
-    // aún no había llegado. En esa ventana, RutaProtegida llegaba a
-    // rechazar rutas que sí debían estar permitidas.
-    if (cargandoSesion) return;
-    if (!session) { setRol('consulta'); setNombre(''); setPerfilListo(true); return; }
+    if (!session) { setRol('consulta'); setNombre(''); setPerfilCargadoPara(null); return; }
     // Bandera de cancelación: si la sesión cambia (logout/login rápido de otro
     // usuario) antes de que esta consulta resuelva, se descarta su resultado
     // para no mezclar el rol/nombre de una sesión con datos de otra.
     let vigente = true;
-    setPerfilListo(false);
     (async () => {
       try {
         const { data, error } = await supabase
@@ -86,7 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         toast('error', 'Error de red al verificar el rol del usuario.');
         setNombre(session.user.email ?? '');
       } finally {
-        if (vigente) setPerfilListo(true);
+        if (vigente) setPerfilCargadoPara(session.user.id);
       }
     })();
     return () => { vigente = false; };
@@ -95,7 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // de token aunque sea el mismo usuario, y sin esto se repetía la consulta
     // de rol/nombre innecesariamente en cada refresco.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session?.user.id, cargandoSesion, toast]);
+  }, [session?.user.id, toast]);
 
   const salir = async () => {
     try {
@@ -106,11 +106,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   // La pantalla de carga cubre tanto la resolución de sesión como la del
-  // perfil (rol/nombre) en la carga inicial, para que el panel nunca se
-  // muestre por un instante con el rol equivocado. En refrescos posteriores
-  // de token (mismo usuario) `perfilListo` ya está en true y no vuelve a
-  // interrumpir al usuario con la pantalla de carga.
-  const cargando = cargandoSesion || (!!session && !perfilListo);
+  // perfil (rol/nombre): mientras el usuario de la sesión actual no
+  // coincida con el usuario para el que ya se cargó el perfil, se sigue
+  // mostrando "cargando" — sin ventanas intermedias con datos de otro
+  // usuario. En refrescos de token (mismo usuario) la comparación sigue
+  // coincidiendo y no vuelve a interrumpir con la pantalla de carga.
+  const cargando = cargandoSesion || (!!session && perfilCargadoPara !== session.user.id);
 
   // Administrador conserva todas las capacidades de Operativo (control
   // total), por eso esOperativo también es verdadero para administrador.
