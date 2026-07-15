@@ -195,13 +195,13 @@ export interface DocumentoMovimiento {
 }
 
 export const TIPOS_ENTRADA = [
-  { codigo: '1000', nombre: 'Compra a proveedor' },
-  { codigo: '1002', nombre: 'Devolución de cliente' },
-  { codigo: '1007', nombre: 'Ajuste positivo de inventario' },
-  { codigo: '1210', nombre: 'Traslado entre bodegas (ingreso)' },
+  { codigo: '1000', nombre: 'Entrada por orden de compra' },
+  { codigo: '1002', nombre: 'Entrada por terceros o satélites' },
+  { codigo: '1007', nombre: 'Devoluciones' },
+  { codigo: '1210', nombre: 'Devolución de insumos de OP' },
 ];
 
 export const TIPOS_SALIDA = [
-  { codigo: '2000', nombre: 'Venta / Despacho' },
-  { codigo: '2003', nombre: 'Salida a clientes' },
+  { codigo: '2000', nombre: 'Salida a OP' },
+  { codigo: '2003', nombre: 'Salida entrega cliente' },
 ];

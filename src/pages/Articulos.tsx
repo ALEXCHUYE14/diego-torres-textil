@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, Pencil, Plus, Power, PowerOff, Save, Search, Trash2 } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { obtenerTodasLasFilas, supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { ConfirmModal, DataTable, PageHeader } from '../components/ui';
@@ -70,19 +70,28 @@ export default function Articulos() {
 
   const cargar = async () => {
     try {
+      // productos usa paginación real (obtenerTodasLasFilas): sin ella,
+      // Supabase tapa la consulta en 1000 filas y con un catálogo grande
+      // los artículos que quedan después de ese corte (ordenados por
+      // fecha) desaparecen del todo de esta pantalla y de la búsqueda de
+      // arriba, aunque sigan existiendo en la base de datos.
       const [
-        { data: f, error: e1 }, { data: p, error: e2 },
+        { data: f, error: e1 }, p,
         { data: g, error: e3 }, { data: c, error: e4 }, { data: t, error: e5 },
       ] = await Promise.all([
         supabase.from('familias').select('*').order('codigo'),
-        supabase.from('productos').select('*').order('activo', { ascending: false }).order('fecha_creacion', { ascending: false }),
+        obtenerTodasLasFilas<Producto>((desde, hasta) =>
+          supabase.from('productos').select('*')
+            .order('activo', { ascending: false }).order('fecha_creacion', { ascending: false })
+            .range(desde, hasta)
+        ),
         supabase.from('generos').select('*').order('nombre'),
         supabase.from('colores').select('*').order('nombre'),
         supabase.from('tallas').select('*').order('nombre'),
       ]);
-      if (e1 || e2 || e3 || e4 || e5) { toast('error', 'No se pudo cargar el catálogo de artículos'); return; }
+      if (e1 || e3 || e4 || e5) { toast('error', 'No se pudo cargar el catálogo de artículos'); return; }
       setFamilias((f as Familia[]) ?? []);
-      setProductos((p as Producto[]) ?? []);
+      setProductos(p);
       setGeneros((g as Genero[]) ?? []);
       setColores((c as Color[]) ?? []);
       setTallas((t as Talla[]) ?? []);

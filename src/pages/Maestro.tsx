@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Download, Search } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { obtenerTodasLasFilas, supabase } from '../lib/supabase';
 import { useToast } from '../context/ToastContext';
 import { DataTable, PageHeader } from '../components/ui';
 import { Familia, Producto } from '../lib/types';
@@ -20,12 +20,19 @@ export default function Maestro() {
   useEffect(() => {
     (async () => {
       try {
-        const [{ data: p, error: e1 }, { data: f, error: e2 }] = await Promise.all([
-          supabase.from('productos').select('*').order('nombre'),
+        // Sin paginar, Supabase tapa la consulta en 1000 filas — con un
+        // catálogo ya grande, artículos que caen después de ese corte
+        // alfabético (ej. una tela que empieza con "T") nunca llegaban al
+        // navegador y por eso el buscador nunca los encontraba, aunque sí
+        // existieran en la base de datos.
+        const [p, { data: f, error: e2 }] = await Promise.all([
+          obtenerTodasLasFilas<Producto>((desde, hasta) =>
+            supabase.from('productos').select('*').order('nombre').range(desde, hasta)
+          ),
           supabase.from('familias').select('*').order('codigo'),
         ]);
-        if (e1 || e2) { toast('error', 'No se pudo cargar el listado maestro de productos'); return; }
-        setProductos((p as Producto[]) ?? []);
+        if (e2) { toast('error', 'No se pudo cargar el listado maestro de productos'); return; }
+        setProductos(p);
         setFamilias((f as Familia[]) ?? []);
       } catch {
         toast('error', 'Error de red al cargar el listado. Verifique su conexión.');
