@@ -80,15 +80,28 @@ export function BuscadorProducto({
     if (q.trim().length < 2) { setResultados([]); setAbierto(false); return; }
     timer.current = setTimeout(async () => {
       const idActual = ++idBusqueda.current;
-      // Envuelto en comillas dobles y escapado: sin esto, un nombre con coma,
-      // paréntesis u otro carácter reservado de PostgREST (frecuente en
-      // descripciones textiles, ej. "DRI (Dril)") rompe la sintaxis del
-      // filtro .or() y la búsqueda devuelve "sin coincidencias" en silencio.
-      const termino = q.trim().replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+      // Busca palabra por palabra, en TODOS los campos visibles del
+      // artículo (nombre, código, género, color, talla) — no solo en
+      // nombre/código. Antes, escribir "chaqueta negro" nunca encontraba
+      // nada si el nombre era "CHAQUETA ACOLCHADA ORION" y el color
+      // "NEGRO" estaba en una columna aparte: se buscaba la frase completa
+      // como un solo texto contra un único campo, y ningún campo la
+      // contenía entera. Ahora cada palabra debe aparecer en ALGÚN campo
+      // (no necesariamente el mismo), como espera cualquiera al buscar.
+      const escapar = (t: string) => t.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+      const CAMPOS = ['nombre', 'codigo_barra', 'genero', 'color', 'talla'];
+      const grupoOr = (palabra: string) => {
+        const p = escapar(palabra);
+        return CAMPOS.map((c) => `${c}.ilike."%${p}%"`).join(',');
+      };
+      const palabras = q.trim().split(/\s+/).filter(Boolean).slice(0, 6);
+      const filtro = palabras.length > 1
+        ? `and(${palabras.map((p) => `or(${grupoOr(p)})`).join(',')})`
+        : grupoOr(palabras[0]);
       let consulta = supabase
         .from('productos')
         .select('*')
-        .or(`nombre.ilike."%${termino}%",codigo_barra.ilike."%${termino}%"`);
+        .or(filtro);
       if (soloActivos) consulta = consulta.eq('activo', true);
       // Antes se ignoraba `error` por completo: si la consulta fallaba (RLS,
       // corte de red, etc.) el usuario solo veía "Sin coincidencias", como si
