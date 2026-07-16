@@ -1,6 +1,7 @@
 import { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Scissors, Search } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { useToast } from '../context/ToastContext';
 import { Producto } from '../lib/types';
 import { numero } from '../utils/format';
 
@@ -57,10 +58,12 @@ export function BuscadorProducto({
   soloActivos?: boolean;
   disabled?: boolean;
 }) {
+  const { toast } = useToast();
   const [q, setQ] = useState('');
   const [resultados, setResultados] = useState<Producto[]>([]);
   const [abierto, setAbierto] = useState(false);
   const [cursor, setCursor] = useState(-1);
+  const [errorBusqueda, setErrorBusqueda] = useState(false);
   const localRef = useRef<HTMLInputElement>(null);
   const ref = inputRef ?? localRef;
   const timer = useRef<ReturnType<typeof setTimeout>>();
@@ -87,14 +90,26 @@ export function BuscadorProducto({
         .select('*')
         .or(`nombre.ilike."%${termino}%",codigo_barra.ilike."%${termino}%"`);
       if (soloActivos) consulta = consulta.eq('activo', true);
-      const { data } = await consulta.limit(8);
+      // Antes se ignoraba `error` por completo: si la consulta fallaba (RLS,
+      // corte de red, etc.) el usuario solo veía "Sin coincidencias", como si
+      // el artículo no existiera, sin ninguna pista de que en realidad la
+      // búsqueda ni siquiera llegó a completarse.
+      const { data, error } = await consulta.limit(8);
       if (idActual !== idBusqueda.current) return;
+      if (error) {
+        setResultados([]);
+        setErrorBusqueda(true);
+        setAbierto(true);
+        toast('error', 'No se pudo buscar productos. Verifique su conexión e intente de nuevo.');
+        return;
+      }
+      setErrorBusqueda(false);
       setResultados((data as Producto[]) ?? []);
       setAbierto(true);
       setCursor(-1);
     }, 220);
     return () => clearTimeout(timer.current);
-  }, [q, soloActivos]);
+  }, [q, soloActivos, toast]);
 
   const elegir = (p: Producto) => {
     onSeleccion(p);
@@ -125,7 +140,9 @@ export function BuscadorProducto({
       />
       {abierto && (
         <ul className="absolute z-30 mt-1.5 max-h-72 w-full overflow-auto rounded-xl border border-pizarra-200 bg-white shadow-sastre-lg">
-          {resultados.length === 0 && (
+          {errorBusqueda ? (
+            <li className="px-4 py-3 text-[14px] font-medium text-red-600">No se pudo buscar. Verifique su conexión.</li>
+          ) : resultados.length === 0 && (
             <li className="px-4 py-3 text-[14px] text-pizarra-400">Sin coincidencias</li>
           )}
           {resultados.map((p, i) => (

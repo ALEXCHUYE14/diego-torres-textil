@@ -109,6 +109,27 @@ export interface Movimiento {
   proveedor?: string | null;
 }
 
+// Fila de rpc_kardex_general: igual que Movimiento, pero de TODOS los
+// artículos a la vez (no de uno solo ya elegido) — por eso incluye el
+// código/nombre del producto en cada fila.
+export interface MovimientoGeneral {
+  tipo_consecutivo: string;
+  documento_numero: string;
+  tipo_movimiento: string;
+  naturaleza: 'ENTRADA' | 'SALIDA';
+  fecha_registro: string;
+  cantidad: number;
+  valor_unitario: number;
+  valor_total: number;
+  stock_resultante: number;
+  nro_factura: string | null;
+  concepto: string | null;
+  producto_codigo: string;
+  producto_nombre: string;
+  proveedor: string | null;
+  usuario_nombre: string | null;
+}
+
 export interface PeriodoBloqueado {
   anio_mes: string;
   bloqueado_por: string | null;

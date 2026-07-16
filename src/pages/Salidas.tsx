@@ -6,7 +6,7 @@ import { useToast } from '../context/ToastContext';
 import { BuscadorProducto, PageHeader } from '../components/ui';
 import DocumentoImpreso from '../components/DocumentoImpreso';
 import { DocumentoMovimiento, LineaMovimiento, Producto, Proveedor, TIPOS_SALIDA } from '../lib/types';
-import { hoyISO, limitesFechaMovimiento, moneda, numero } from '../utils/format';
+import { limitesFechaMovimiento, moneda, numero } from '../utils/format';
 
 const claveLocal = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
@@ -18,7 +18,10 @@ export default function Salidas() {
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
   const [proveedor, setProveedor] = useState<Proveedor | null>(null);
   const [tipoMov, setTipoMov] = useState('2000');
-  const [fecha, setFecha] = useState(hoyISO());
+  // Vacía a propósito: si arrancara con hoyISO(), es muy fácil guardar sin
+  // darse cuenta con la fecha de hoy cuando en realidad se quería digitar
+  // un movimiento de otro día — obliga a elegir la fecha siempre a mano.
+  const [fecha, setFecha] = useState('');
   const [concepto, setConcepto] = useState('');
   const [lineas, setLineas] = useState<LineaMovimiento[]>([]);
   const [guardando, setGuardando] = useState(false);
@@ -58,7 +61,7 @@ export default function Salidas() {
   );
 
   const limpiar = () => {
-    setProveedor(null); setTipoMov('2000'); setFecha(hoyISO());
+    setProveedor(null); setTipoMov('2000'); setFecha('');
     setConcepto(''); setLineas([]);
     buscadorRef.current?.focus();
   };
@@ -74,6 +77,7 @@ export default function Salidas() {
   const guardar = async (e: FormEvent) => {
     e.preventDefault();
     setDocumentoGuardado(null);
+    if (!fecha) { toast('aviso', 'Seleccione la fecha del movimiento'); return; }
     if (lineas.length === 0) { toast('aviso', 'Agregue al menos un artículo a la salida'); return; }
     for (const l of lineas) {
       const c = parseFloat(l.cantidad);
