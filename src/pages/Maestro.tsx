@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { Download, Search } from 'lucide-react';
 import { obtenerTodasLasFilas, supabase } from '../lib/supabase';
 import { useToast } from '../context/ToastContext';
 import { DataTable, PageHeader } from '../components/ui';
 import { Familia, Producto } from '../lib/types';
 import { moneda, numero } from '../utils/format';
+import { coincideProducto } from '../utils/busqueda';
 
 // Vista de solo lectura, disponible para los 3 roles (incluido Consulta):
 // listado completo del catálogo con búsqueda instantánea por nombre,
@@ -47,16 +48,15 @@ export default function Maestro() {
     return (id: string) => mapa.get(id) ?? '—';
   }, [familias]);
 
+  // useDeferredValue: evita que el filtrado de un catálogo grande bloquee el
+  // tecleo — misma razón que en Articulos.tsx.
+  const busquedaDiferida = useDeferredValue(busqueda);
   const filtrados = useMemo(() => {
-    const termino = busqueda.trim().toLowerCase();
-    if (!termino) return productos;
-    return productos.filter((p) => {
-      const familia = nombreFamilia(p.id_familia);
-      return [p.nombre, p.codigo_barra, familia, p.genero, p.color, p.talla]
-        .filter(Boolean)
-        .some((campo) => campo!.toLowerCase().includes(termino));
-    });
-  }, [productos, busqueda, nombreFamilia]);
+    if (!busquedaDiferida.trim()) return productos;
+    // coincideProducto (src/utils/busqueda.ts): búsqueda por palabras,
+    // insensible a tildes/mayúsculas — misma lógica en todo el sistema.
+    return productos.filter((p) => coincideProducto(p, busquedaDiferida, [nombreFamilia(p.id_familia)]));
+  }, [productos, busquedaDiferida, nombreFamilia]);
 
   // Exporta exactamente lo que está en pantalla (respeta la búsqueda activa):
   // si hay un filtro escrito, descarga solo esas filas; si no, descarga todo

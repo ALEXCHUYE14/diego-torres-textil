@@ -80,34 +80,24 @@ export function BuscadorProducto({
     if (q.trim().length < 2) { setResultados([]); setAbierto(false); return; }
     timer.current = setTimeout(async () => {
       const idActual = ++idBusqueda.current;
-      // Busca palabra por palabra, en TODOS los campos visibles del
-      // artículo (nombre, código, género, color, talla) — no solo en
-      // nombre/código. Antes, escribir "chaqueta negro" nunca encontraba
-      // nada si el nombre era "CHAQUETA ACOLCHADA ORION" y el color
-      // "NEGRO" estaba en una columna aparte: se buscaba la frase completa
-      // como un solo texto contra un único campo, y ningún campo la
-      // contenía entera. Ahora cada palabra debe aparecer en ALGÚN campo
-      // (no necesariamente el mismo), como espera cualquiera al buscar.
-      const escapar = (t: string) => t.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-      const CAMPOS = ['nombre', 'codigo_barra', 'genero', 'color', 'talla'];
-      const grupoOr = (palabra: string) => {
-        const p = escapar(palabra);
-        return CAMPOS.map((c) => `${c}.ilike."%${p}%"`).join(',');
-      };
-      const palabras = q.trim().split(/\s+/).filter(Boolean).slice(0, 6);
-      const filtro = palabras.length > 1
-        ? `and(${palabras.map((p) => `or(${grupoOr(p)})`).join(',')})`
-        : grupoOr(palabras[0]);
-      let consulta = supabase
-        .from('productos')
-        .select('*')
-        .or(filtro);
-      if (soloActivos) consulta = consulta.eq('activo', true);
+      // Búsqueda centralizada en el servidor (rpc_buscar_productos, ver
+      // supabase/migration_013_busqueda_optimizada.sql): parte el término en
+      // palabras y exige que cada una aparezca en ALGÚN campo visible del
+      // artículo (nombre, código, género, color, talla) — no necesariamente
+      // el mismo campo, así "chaqueta negro" encuentra nombre="CHAQUETA
+      // ACOLCHADA ORION" con color="NEGRO". La RPC además ignora
+      // mayúsculas/minúsculas Y tildes (antes "pantalon" no encontraba
+      // "PANTALÓN"), algo que un filtro `ilike` armado en el cliente no
+      // podía resolver sin duplicar esa lógica de normalización aquí.
+      const { data, error } = await supabase.rpc('rpc_buscar_productos', {
+        p_termino: q,
+        p_solo_activos: soloActivos,
+        p_limite: 8,
+      });
       // Antes se ignoraba `error` por completo: si la consulta fallaba (RLS,
       // corte de red, etc.) el usuario solo veía "Sin coincidencias", como si
       // el artículo no existiera, sin ninguna pista de que en realidad la
       // búsqueda ni siquiera llegó a completarse.
-      const { data, error } = await consulta.limit(8);
       if (idActual !== idBusqueda.current) return;
       if (error) {
         setResultados([]);

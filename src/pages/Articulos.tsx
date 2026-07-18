@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, Pencil, Plus, Power, PowerOff, Save, Search, Trash2 } from 'lucide-react';
 import { obtenerTodasLasFilas, supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
@@ -7,6 +7,7 @@ import { ConfirmModal, DataTable, PageHeader } from '../components/ui';
 import ImportadorCatalogo from '../components/ImportadorCatalogo';
 import { Color, Familia, Genero, Producto, Talla } from '../lib/types';
 import { moneda, numero } from '../utils/format';
+import { coincideProducto } from '../utils/busqueda';
 
 export default function Articulos() {
   const { toast } = useToast();
@@ -44,15 +45,19 @@ export default function Articulos() {
   // particular, uno ya desactivado, que sigue apareciendo en la lista pero
   // puede quedar lejos de la vista. Este filtro busca en todo el catálogo
   // cargado (activos e inactivos), no solo en la página visible.
+  // useDeferredValue: con catálogos grandes, filtrar en cada tecleo puede
+  // tardar lo suficiente como para que el input se sienta trabado. React
+  // sigue mostrando lo que el usuario escribe al instante y recalcula la
+  // lista filtrada en una render de baja prioridad, sin bloquear el tecleo.
+  const busquedaDiferida = useDeferredValue(busqueda);
   const productosFiltrados = useMemo(() => {
-    const termino = busqueda.trim().toLowerCase();
-    if (!termino) return productos;
-    return productos.filter((p) =>
-      [p.nombre, p.codigo_barra, p.genero, p.color, p.talla]
-        .filter(Boolean)
-        .some((campo) => campo!.toLowerCase().includes(termino))
-    );
-  }, [productos, busqueda]);
+    if (!busquedaDiferida.trim()) return productos;
+    // coincideProducto (src/utils/busqueda.ts): separa por palabras e
+    // ignora tildes/mayúsculas — misma lógica que el buscador con
+    // autocompletado (BuscadorProducto) y que rpc_buscar_productos en el
+    // servidor, para que "buscar" se comporte igual en todo el sistema.
+    return productos.filter((p) => coincideProducto(p, busquedaDiferida));
+  }, [productos, busquedaDiferida]);
 
   // Composición dinámica en pantalla del código final: genero/color/talla son
   // opcionales, así que se omiten del código si el usuario los deja en blanco.

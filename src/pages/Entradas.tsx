@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { BuscadorProducto, PageHeader } from '../components/ui';
+import SelectorVariantes, { ItemLoteVariantes } from '../components/SelectorVariantes';
 import DocumentoImpreso from '../components/DocumentoImpreso';
 import { DocumentoMovimiento, LineaMovimiento, Producto, Proveedor, TIPOS_ENTRADA } from '../lib/types';
 import { limitesFechaMovimiento, moneda, numero } from '../utils/format';
@@ -52,6 +53,23 @@ export default function Entradas() {
   const quitarLinea = (clave: string) => setLineas((ls) => ls.filter((l) => l.clave !== clave));
   const actualizarLinea = (clave: string, campo: 'cantidad' | 'valorUnitario', valor: string) =>
     setLineas((ls) => ls.map((l) => (l.clave === clave ? { ...l, [campo]: valor } : l)));
+
+  // Alta múltiple: agrega de una vez todas las tallas que el usuario cargó
+  // en SelectorVariantes (ej. 10 tallas de la misma camisa), en vez de
+  // repetir "buscar + agregar" una por una. Las líneas resultantes son
+  // indistinguibles de las agregadas con BuscadorProducto: el documento
+  // sigue siendo uno solo con N líneas al guardar.
+  const agregarLote = (items: ItemLoteVariantes[]) => {
+    setLineas((ls) => [
+      ...ls,
+      ...items.map((it) => ({
+        clave: claveLocal(),
+        producto: it.producto,
+        cantidad: it.cantidad,
+        valorUnitario: it.valorUnitario ?? (it.producto.costo_promedio_ponderado ? String(it.producto.costo_promedio_ponderado) : ''),
+      })),
+    ]);
+  };
 
   const total = useMemo(
     () => lineas.reduce((s, l) => s + (parseFloat(l.cantidad) || 0) * (parseFloat(l.valorUnitario) || 0), 0),
@@ -188,6 +206,15 @@ export default function Entradas() {
 
         <label className="dt-label">Agregar artículo a la entrada</label>
         <BuscadorProducto onSeleccion={agregarLinea} inputRef={buscadorRef} autoFocus disabled={guardando} placeholder="Busque un artículo y presione Enter para agregarlo…" />
+
+        <div className="mt-3">
+          <SelectorVariantes
+            onAgregarLote={agregarLote}
+            disabled={guardando}
+            mostrarValorUnitario
+            idsExistentes={lineas.map((l) => l.producto.id_producto)}
+          />
+        </div>
 
         <div className="mt-4 space-y-2.5">
           {lineas.length === 0 && (

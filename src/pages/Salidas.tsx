@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { BuscadorProducto, PageHeader } from '../components/ui';
+import SelectorVariantes, { ItemLoteVariantes } from '../components/SelectorVariantes';
 import DocumentoImpreso from '../components/DocumentoImpreso';
 import { DocumentoMovimiento, LineaMovimiento, Producto, Proveedor, TIPOS_SALIDA } from '../lib/types';
 import { limitesFechaMovimiento, moneda, numero } from '../utils/format';
@@ -51,6 +52,17 @@ export default function Salidas() {
   const quitarLinea = (clave: string) => setLineas((ls) => ls.filter((l) => l.clave !== clave));
   const actualizarCantidad = (clave: string, valor: string) =>
     setLineas((ls) => ls.map((l) => (l.clave === clave ? { ...l, cantidad: valor } : l)));
+
+  // Alta múltiple: agrega de una vez todas las tallas cargadas en
+  // SelectorVariantes. Este ya excluye del lote las tallas que estén en
+  // `idsExistentes` (ver prop más abajo), así que aquí no hace falta repetir
+  // la validación de duplicados de agregarLinea.
+  const agregarLote = (items: ItemLoteVariantes[]) => {
+    setLineas((ls) => [
+      ...ls,
+      ...items.map((it) => ({ clave: claveLocal(), producto: it.producto, cantidad: it.cantidad, valorUnitario: String(it.producto.costo_promedio_ponderado) })),
+    ]);
+  };
 
   const excedeStock = (l: LineaMovimiento) => (parseFloat(l.cantidad) || 0) > l.producto.stock_real;
   const algunaExcede = lineas.some(excedeStock);
@@ -174,6 +186,14 @@ export default function Salidas() {
 
         <label className="dt-label">Agregar artículo a la salida</label>
         <BuscadorProducto onSeleccion={agregarLinea} inputRef={buscadorRef} autoFocus disabled={guardando} placeholder="Busque un artículo y presione Enter para agregarlo…" />
+
+        <div className="mt-3">
+          <SelectorVariantes
+            onAgregarLote={agregarLote}
+            disabled={guardando}
+            idsExistentes={lineas.map((l) => l.producto.id_producto)}
+          />
+        </div>
 
         <div className="mt-4 space-y-2.5">
           {lineas.length === 0 && (
