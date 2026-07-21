@@ -4,8 +4,8 @@ import { obtenerTodasLasFilas, supabase } from '../lib/supabase';
 import { useToast } from '../context/ToastContext';
 import { DataTable, PageHeader } from '../components/ui';
 import { Familia, Producto } from '../lib/types';
-import { moneda, numero } from '../utils/format';
-import { coincideProducto } from '../utils/busqueda';
+import { moneda, numero, soloFecha } from '../utils/format';
+import { filtrarProductos } from '../utils/busqueda';
 
 // Vista de solo lectura, disponible para los 3 roles (incluido Consulta):
 // listado completo del catálogo con búsqueda instantánea por nombre,
@@ -51,19 +51,20 @@ export default function Maestro() {
   // useDeferredValue: evita que el filtrado de un catálogo grande bloquee el
   // tecleo — misma razón que en Articulos.tsx.
   const busquedaDiferida = useDeferredValue(busqueda);
-  const filtrados = useMemo(() => {
-    if (!busquedaDiferida.trim()) return productos;
-    // coincideProducto (src/utils/busqueda.ts): búsqueda por palabras,
-    // insensible a tildes/mayúsculas — misma lógica en todo el sistema.
-    return productos.filter((p) => coincideProducto(p, busquedaDiferida, [nombreFamilia(p.id_familia)]));
-  }, [productos, busquedaDiferida, nombreFamilia]);
+  const filtrados = useMemo(
+    // filtrarProductos (src/utils/busqueda.ts): búsqueda por palabras,
+    // insensible a tildes/mayúsculas, con fallback a coincidencia parcial —
+    // misma lógica en todo el sistema (Articulos.tsx, BuscadorProducto).
+    () => filtrarProductos(productos, busquedaDiferida, (p) => [nombreFamilia(p.id_familia)]),
+    [productos, busquedaDiferida, nombreFamilia]
+  );
 
   // Exporta exactamente lo que está en pantalla (respeta la búsqueda activa):
   // si hay un filtro escrito, descarga solo esas filas; si no, descarga todo
   // el catálogo. Valores numéricos sin formatear (sin "S/" ni separadores de
   // miles) para que Excel/Sheets los reconozca como números, no como texto.
   const descargarCSV = () => {
-    const encabezados = ['Código', 'Nombre', 'Género', 'Color', 'Talla', 'Familia', 'Stock', 'CPP', 'Precio venta', 'Estado'];
+    const encabezados = ['Código', 'Nombre', 'Género', 'Color', 'Talla', 'Familia', 'Stock', 'CPP', 'Precio venta', 'Estado', 'Creado'];
     const escapar = (valor: string) => `"${valor.replace(/"/g, '""')}"`;
     const filas = filtrados.map((p) => [
       p.codigo_barra,
@@ -76,6 +77,7 @@ export default function Maestro() {
       p.costo_promedio_ponderado,
       p.precio_venta,
       p.activo ? 'Activo' : 'Inactivo',
+      soloFecha(p.fecha_creacion),
     ].map((campo) => escapar(String(campo))).join(','));
 
     const csv = [encabezados.map(escapar).join(','), ...filas].join('\r\n');
@@ -134,6 +136,7 @@ export default function Maestro() {
                 {p.activo ? 'Activo' : 'Inactivo'}
               </span>
             )},
+            { clave: 'fecha_creacion', titulo: 'Creado', render: (p) => <span className="text-pizarra-500">{soloFecha(p.fecha_creacion)}</span> },
           ]}
           filas={filtrados as Array<Producto & Record<string, unknown>>}
           porPagina={12}

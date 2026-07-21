@@ -36,6 +36,20 @@
 --  índice de trigramas (pg_trgm) para reducir superficie de fallo: con el
 --  tamaño de catálogo de este sistema, un filtro secuencial con `like` sobre
 --  texto ya normalizado es suficientemente rápido sin índice especializado.
+--
+--  Segundo problema corregido en ESTA versión ("Sin coincidencias" al buscar
+--  con una descripción larga, ej. "CAMISETA POLO M/C BLANCA HOMBRE"):
+--  rpc_buscar_productos exigía que TODAS las palabras escritas aparecieran
+--  en algún campo (AND estricto). Es preciso, pero es frágil apenas una sola
+--  palabra no calza exactamente con lo guardado (abreviaturas como "M/C" en
+--  vez de "MANGA CORTA", una palabra de más, un plural) — toda la búsqueda
+--  se queda en cero resultados aunque el artículo exista y el resto de las
+--  palabras sí coincidan. Ahora, si la búsqueda estricta no encuentra nada,
+--  la función reintenta automáticamente permitiendo coincidencias parciales
+--  (basta con que UNA palabra coincida) y ordena los resultados por cuántas
+--  palabras sí coincidieron, mostrando primero los más relevantes. El
+--  usuario nunca se queda con "Sin coincidencias" mientras al menos una
+--  palabra de lo que escribió aparezca en algún artículo.
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------
@@ -82,8 +96,10 @@ security definer
 set search_path = public, extensions
 as $$
 declare
-  v_termino  text := trim(coalesce(p_termino, ''));
-  v_palabras text[];
+  v_termino    text := trim(coalesce(p_termino, ''));
+  v_palabras   text[];
+  v_encontrados int;
+  v_limite     int := greatest(1, least(coalesce(p_limite, 8), 50));
 begin
   if length(v_termino) < 2 then
     return;
@@ -102,6 +118,7 @@ begin
     return;
   end if;
 
+  -- Paso 1 (preciso): exige que TODAS las palabras aparezcan en algún campo.
   return query
   select p.*
   from productos p
@@ -120,7 +137,34 @@ begin
     (fn_normalizar(p.codigo_barra) = v_palabras[1]) desc,
     (fn_normalizar(p.nombre) like v_palabras[1] || '%') desc,
     p.nombre
-  limit greatest(1, least(coalesce(p_limite, 8), 50));
+  limit v_limite;
+
+  get diagnostics v_encontrados = row_count;
+  if v_encontrados > 0 then
+    return;
+  end if;
+
+  -- Paso 2 (tolerante, solo si el paso 1 no encontró nada): basta con que
+  -- UNA palabra coincida en algún campo. Ordena por cuántas palabras
+  -- coincidieron (más relevante primero) para que, aun con una búsqueda
+  -- imprecisa, el usuario vea los candidatos más cercanos en vez de una
+  -- lista vacía.
+  return query
+  select p.*
+  from productos p
+  join lateral (
+    select count(*) as coincidencias
+    from unnest(v_palabras) as palabra
+    where fn_normalizar(p.nombre) like '%' || palabra || '%'
+       or fn_normalizar(p.codigo_barra) like '%' || palabra || '%'
+       or fn_normalizar(coalesce(p.genero, '')) like '%' || palabra || '%'
+       or fn_normalizar(coalesce(p.color, '')) like '%' || palabra || '%'
+       or fn_normalizar(coalesce(p.talla, '')) like '%' || palabra || '%'
+  ) m on true
+  where (p_solo_activos = false or p.activo = true)
+    and m.coincidencias > 0
+  order by m.coincidencias desc, p.nombre
+  limit v_limite;
 end $$;
 
 -- ============================================================================

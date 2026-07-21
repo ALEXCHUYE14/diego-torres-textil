@@ -7,7 +7,7 @@ import { ConfirmModal, DataTable, PageHeader } from '../components/ui';
 import ImportadorCatalogo from '../components/ImportadorCatalogo';
 import { Color, Familia, Genero, Producto, Talla } from '../lib/types';
 import { moneda, numero } from '../utils/format';
-import { coincideProducto } from '../utils/busqueda';
+import { filtrarProductos } from '../utils/busqueda';
 
 export default function Articulos() {
   const { toast } = useToast();
@@ -50,14 +50,15 @@ export default function Articulos() {
   // sigue mostrando lo que el usuario escribe al instante y recalcula la
   // lista filtrada en una render de baja prioridad, sin bloquear el tecleo.
   const busquedaDiferida = useDeferredValue(busqueda);
-  const productosFiltrados = useMemo(() => {
-    if (!busquedaDiferida.trim()) return productos;
-    // coincideProducto (src/utils/busqueda.ts): separa por palabras e
-    // ignora tildes/mayúsculas — misma lógica que el buscador con
-    // autocompletado (BuscadorProducto) y que rpc_buscar_productos en el
-    // servidor, para que "buscar" se comporte igual en todo el sistema.
-    return productos.filter((p) => coincideProducto(p, busquedaDiferida));
-  }, [productos, busquedaDiferida]);
+  const productosFiltrados = useMemo(
+    // filtrarProductos (src/utils/busqueda.ts): separa por palabras, ignora
+    // tildes/mayúsculas y — si nada calza con TODAS las palabras — cae a
+    // coincidencia parcial ordenada por relevancia, igual que
+    // rpc_buscar_productos en el servidor, para que "buscar" se comporte
+    // igual en todo el sistema.
+    () => filtrarProductos(productos, busquedaDiferida),
+    [productos, busquedaDiferida]
+  );
 
   // Composición dinámica en pantalla del código final: genero/color/talla son
   // opcionales, así que se omiten del código si el usuario los deja en blanco.

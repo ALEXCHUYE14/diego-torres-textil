@@ -23,6 +23,21 @@ export function palabrasBusqueda(termino: string): string[] {
   return normalizado.split(' ').filter(Boolean).slice(0, MAX_PALABRAS);
 }
 
+type CamposProducto = Pick<Producto, 'nombre' | 'codigo_barra' | 'genero' | 'color' | 'talla'>;
+
+/** Cuántas de las `palabras` aparecen en ALGÚN campo del producto (0..palabras.length). */
+function contarCoincidencias(
+  producto: CamposProducto,
+  palabras: string[],
+  camposExtra: Array<string | null | undefined>
+): number {
+  if (palabras.length === 0) return 0;
+  const campos = [producto.nombre, producto.codigo_barra, producto.genero, producto.color, producto.talla, ...camposExtra]
+    .filter((c): c is string => !!c && c.length > 0)
+    .map(normalizarTexto);
+  return palabras.reduce((total, palabra) => total + (campos.some((campo) => campo.includes(palabra)) ? 1 : 0), 0);
+}
+
 /**
  * true si CADA palabra del término aparece en ALGÚN campo del producto
  * (nombre, código, género, color, talla, + los que se pasen en camposExtra).
@@ -30,18 +45,46 @@ export function palabrasBusqueda(termino: string): string[] {
  * encuentra nombre="CAMISA MANGA LARGA", color="AZUL", talla="M".
  */
 export function coincideProducto(
-  producto: Pick<Producto, 'nombre' | 'codigo_barra' | 'genero' | 'color' | 'talla'>,
+  producto: CamposProducto,
   termino: string,
   camposExtra: Array<string | null | undefined> = []
 ): boolean {
   const palabras = palabrasBusqueda(termino);
   if (palabras.length === 0) return true;
+  return contarCoincidencias(producto, palabras, camposExtra) === palabras.length;
+}
 
-  const campos = [producto.nombre, producto.codigo_barra, producto.genero, producto.color, producto.talla, ...camposExtra]
-    .filter((c): c is string => !!c && c.length > 0)
-    .map(normalizarTexto);
+/**
+ * Filtra una lista de productos por texto libre, con la misma tolerancia que
+ * rpc_buscar_productos en el servidor (ver
+ * supabase/migration_013_busqueda_optimizada.sql): primero exige que TODAS
+ * las palabras coincidan (preciso); si eso no devuelve nada, cae a
+ * coincidencia parcial (basta con que UNA palabra coincida) ordenada por
+ * cuántas palabras coincidieron. Sin este segundo intento, una búsqueda con
+ * una sola palabra que no calza exactamente (abreviatura, plural, una
+ * palabra de más) deja al usuario con una lista vacía aunque el artículo
+ * exista y el resto de lo escrito sí coincida.
+ */
+export function filtrarProductos<T extends CamposProducto>(
+  productos: T[],
+  termino: string,
+  extraPorProducto?: (producto: T) => Array<string | null | undefined>
+): T[] {
+  const palabras = palabrasBusqueda(termino);
+  if (palabras.length === 0) return productos;
 
-  return palabras.every((palabra) => campos.some((campo) => campo.includes(palabra)));
+  const conteo = productos.map((producto) => ({
+    producto,
+    coincidencias: contarCoincidencias(producto, palabras, extraPorProducto ? extraPorProducto(producto) : []),
+  }));
+
+  const exactos = conteo.filter((c) => c.coincidencias === palabras.length).map((c) => c.producto);
+  if (exactos.length > 0) return exactos;
+
+  return conteo
+    .filter((c) => c.coincidencias > 0)
+    .sort((a, b) => b.coincidencias - a.coincidencias)
+    .map((c) => c.producto);
 }
 
 /**
