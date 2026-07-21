@@ -1,8 +1,10 @@
 -- ============================================================================
 --  DIEGO TORRES · Migración 013 — Motor de búsqueda unificado
 --  Ejecutar en el SQL Editor de Supabase después de la migración 012.
+--  Segura de volver a ejecutar (create extension/or replace/if not exists):
+--  si ya la corrió antes, este archivo corrige un bug de la primera versión.
 --
---  Problema que corrige:
+--  Problema que corrige (búsqueda):
 --  El buscador de artículos (BuscadorProducto, usado en Entradas/Salidas/
 --  Kardex) armaba el filtro `ilike` a mano en el cliente y lo mandaba tal
 --  cual a PostgREST. Eso funcionaba para mayúsculas/minúsculas (ilike ya es
@@ -15,26 +17,32 @@
 --  (sin separar por palabras) en Articulos.tsx y Maestro.tsx.
 --
 --  Esta migración centraliza el matching en una sola función SQL
---  (fn_normalizar + rpc_buscar_productos) que:
---    1. Ignora tildes/diacríticos (extensión unaccent).
---    2. Ignora mayúsculas/minúsculas.
---    3. Colapsa espacios en blanco redundantes.
---    4. Busca por palabras: cada palabra escrita debe aparecer en ALGÚN
---       campo (nombre, código, género, color o talla), no necesariamente
---       todas en el mismo campo — así "camisa azul m" encuentra un artículo
---       con nombre "CAMISA MANGA LARGA", color "AZUL" y talla "M".
---    5. Usa un índice de trigramas (pg_trgm) sobre nombre y código para que
---       la búsqueda siga siendo rápida a medida que crece el catálogo.
---  El frontend (BuscadorProducto) pasa a llamar esta única RPC en vez de
---  construir el filtro `.or()` a mano.
+--  (fn_normalizar + rpc_buscar_productos) que ignora tildes (extensión
+--  unaccent), mayúsculas/minúsculas y busca por palabras: cada palabra
+--  escrita debe aparecer en ALGÚN campo (nombre, código, género, color o
+--  talla), no necesariamente todas en el mismo campo.
+--
+--  Bug corregido en ESTA versión (causaba "No se pudo buscar productos" en
+--  TODA búsqueda, ver captura de pantalla del error en Salidas):
+--  Supabase instala las extensiones (unaccent, pg_trgm) en el esquema
+--  "extensions", no en "public". La primera versión de fn_normalizar y
+--  rpc_buscar_productos fijaban `set search_path = public` (o ninguno), y
+--  ese `search_path` es el que usa la función CADA VEZ que se ejecuta vía
+--  PostgREST — no el search_path de la sesión del SQL Editor donde se corrió
+--  esta migración. Como resultado, unaccent() nunca se encontraba en tiempo
+--  de ejecución y la función fallaba con error en cada llamada, sin importar
+--  que la migración se hubiese ejecutado sin errores. Se corrige agregando
+--  "extensions" al search_path de ambas funciones. También se retira el
+--  índice de trigramas (pg_trgm) para reducir superficie de fallo: con el
+--  tamaño de catálogo de este sistema, un filtro secuencial con `like` sobre
+--  texto ya normalizado es suficientemente rápido sin índice especializado.
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------
--- 1. Extensiones necesarias (ambas están en la lista de extensiones
---    permitidas de Supabase, no requieren privilegios especiales).
+-- 1. Extensión necesaria (contrib estándar, disponible en todo plan de
+--    Supabase, no requiere privilegios especiales).
 -- ----------------------------------------------------------------------------
 create extension if not exists unaccent;
-create extension if not exists pg_trgm;
 
 -- ----------------------------------------------------------------------------
 -- 2. fn_normalizar · MAYÚSCULAS + sin tildes, envuelta como IMMUTABLE.
@@ -42,29 +50,22 @@ create extension if not exists pg_trgm;
 --    lo cual impide usarla en un índice funcional. Fijar el diccionario
 --    explícitamente a 'unaccent' vía unaccent(regdictionary, text) permite
 --    marcar el envoltorio como IMMUTABLE de forma segura.
+--    search_path incluye "extensions" porque ahí es donde Supabase instala
+--    unaccent por defecto (ver nota de bug arriba) — sin esto, la función
+--    falla en tiempo de ejecución aunque la migración se haya "aplicado bien".
 -- ----------------------------------------------------------------------------
 create or replace function fn_normalizar(p_texto text)
 returns text
 language sql
 immutable
 parallel safe
+set search_path = public, extensions
 as $$
   select upper(unaccent('unaccent'::regdictionary, coalesce(p_texto, '')));
 $$;
 
 -- ----------------------------------------------------------------------------
--- 3. Índices de trigramas sobre los campos normalizados más buscados
---    (nombre y código). género/color/talla son catálogos cerrados de pocos
---    valores (ver Catalogos.tsx): un filtro secuencial sobre ellos es
---    despreciable en costo, no necesitan índice propio.
--- ----------------------------------------------------------------------------
-create index if not exists idx_productos_norm_nombre
-  on productos using gin (fn_normalizar(nombre) gin_trgm_ops);
-create index if not exists idx_productos_norm_codigo
-  on productos using gin (fn_normalizar(codigo_barra) gin_trgm_ops);
-
--- ----------------------------------------------------------------------------
--- 4. rpc_buscar_productos · reemplaza el filtro `.or()` armado a mano en
+-- 3. rpc_buscar_productos · reemplaza el filtro `.or()` armado a mano en
 --    BuscadorProducto (src/components/ui.tsx). `stable` porque solo lee.
 --    No exige rol: los 3 roles (consulta/operativo/administrador) pueden
 --    buscar artículos, igual que antes.
@@ -78,7 +79,7 @@ returns setof productos
 language plpgsql
 stable
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 declare
   v_termino  text := trim(coalesce(p_termino, ''));
@@ -88,9 +89,8 @@ begin
     return;
   end if;
 
-  -- Colapsa espacios repetidos y parte en palabras (máx. 6, igual que el
-  -- límite que antes aplicaba el cliente, para no admitir consultas
-  -- arbitrariamente largas/costosas).
+  -- Parte en palabras (máx. 6, igual que el límite que antes aplicaba el
+  -- cliente, para no admitir consultas arbitrariamente largas/costosas).
   select array_agg(w) into v_palabras
   from (
     select unnest(regexp_split_to_array(fn_normalizar(v_termino), '\s+')) as w

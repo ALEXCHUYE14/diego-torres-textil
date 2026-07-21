@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useToast } from '../context/ToastContext';
 import { Producto } from '../lib/types';
 import { numero } from '../utils/format';
+import { mensajeErrorBusqueda } from '../utils/busqueda';
 
 /* ============================================================
    Modal de confirmación elegante (Eliminar, acciones críticas)
@@ -63,7 +64,7 @@ export function BuscadorProducto({
   const [resultados, setResultados] = useState<Producto[]>([]);
   const [abierto, setAbierto] = useState(false);
   const [cursor, setCursor] = useState(-1);
-  const [errorBusqueda, setErrorBusqueda] = useState(false);
+  const [mensajeError, setMensajeError] = useState<string | null>(null);
   const localRef = useRef<HTMLInputElement>(null);
   const ref = inputRef ?? localRef;
   const timer = useRef<ReturnType<typeof setTimeout>>();
@@ -100,13 +101,19 @@ export function BuscadorProducto({
       // búsqueda ni siquiera llegó a completarse.
       if (idActual !== idBusqueda.current) return;
       if (error) {
+        // mensajeErrorBusqueda distingue "el servidor no tiene la función/
+        // extensión de búsqueda configurada" (falta aplicar una migración)
+        // de un problema real de red — antes ambos casos mostraban el mismo
+        // "verifique su conexión", lo que llevaba a diagnosticar mal la
+        // causa (ver supabase/migration_013_busqueda_optimizada.sql).
+        const msg = mensajeErrorBusqueda(error);
         setResultados([]);
-        setErrorBusqueda(true);
+        setMensajeError(msg);
         setAbierto(true);
-        toast('error', 'No se pudo buscar productos. Verifique su conexión e intente de nuevo.');
+        toast('error', msg);
         return;
       }
-      setErrorBusqueda(false);
+      setMensajeError(null);
       setResultados((data as Producto[]) ?? []);
       setAbierto(true);
       setCursor(-1);
@@ -143,8 +150,8 @@ export function BuscadorProducto({
       />
       {abierto && (
         <ul className="absolute z-30 mt-1.5 max-h-72 w-full overflow-auto rounded-xl border border-pizarra-200 bg-white shadow-sastre-lg">
-          {errorBusqueda ? (
-            <li className="px-4 py-3 text-[14px] font-medium text-red-600">No se pudo buscar. Verifique su conexión.</li>
+          {mensajeError ? (
+            <li className="px-4 py-3 text-[13px] font-medium leading-snug text-red-600">{mensajeError}</li>
           ) : resultados.length === 0 && (
             <li className="px-4 py-3 text-[14px] text-pizarra-400">Sin coincidencias</li>
           )}

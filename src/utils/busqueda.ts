@@ -43,3 +43,27 @@ export function coincideProducto(
 
   return palabras.every((palabra) => campos.some((campo) => campo.includes(palabra)));
 }
+
+/**
+ * Traduce el error de supabase.rpc('rpc_buscar_productos', ...) a un mensaje
+ * accionable. Si la función/extensión no está creada en el servidor (falta
+ * aplicar supabase/migration_013_busqueda_optimizada.sql, o quedó aplicada a
+ * medias — ver el comentario de bug en ese archivo), PostgREST responde con
+ * "Could not find the function..." (código PGRST202) o, si la función existe
+ * pero unaccent() no resuelve en su search_path, con un error interno de
+ * Postgres. En ambos casos mostrar "Verifique su conexión" es engañoso: el
+ * problema no es de red, es que falta una migración en la base de datos.
+ */
+export function mensajeErrorBusqueda(error: { message?: string; code?: string } | null | undefined): string {
+  const msg = error?.message ?? '';
+  const noConfigurada =
+    error?.code === 'PGRST202' ||
+    /could not find the function/i.test(msg) ||
+    /rpc_buscar_productos/i.test(msg) ||
+    /unaccent/i.test(msg) ||
+    /function .* does not exist/i.test(msg);
+  if (noConfigurada) {
+    return 'La búsqueda no está disponible: falta aplicar la migración de base de datos "migration_013_busqueda_optimizada.sql" en Supabase. Contacte al administrador del sistema.';
+  }
+  return 'No se pudo buscar productos. Verifique su conexión e intente de nuevo.';
+}

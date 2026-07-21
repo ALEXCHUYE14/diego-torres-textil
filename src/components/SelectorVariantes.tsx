@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useToast } from '../context/ToastContext';
 import { Producto } from '../lib/types';
 import { numero } from '../utils/format';
+import { mensajeErrorBusqueda } from '../utils/busqueda';
 
 export interface ItemLoteVariantes {
   producto: Producto;
@@ -42,6 +43,7 @@ export default function SelectorVariantes({
   const [q, setQ] = useState('');
   const [resultados, setResultados] = useState<Producto[]>([]);
   const [buscando, setBuscando] = useState(false);
+  const [mensajeError, setMensajeError] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout>>();
   const idBusqueda = useRef(0);
 
@@ -57,7 +59,7 @@ export default function SelectorVariantes({
   // aparte al seleccionarlo.
   useEffect(() => {
     clearTimeout(timer.current);
-    if (q.trim().length < 2) { setResultados([]); return; }
+    if (q.trim().length < 2) { setResultados([]); setMensajeError(null); return; }
     timer.current = setTimeout(async () => {
       const idActual = ++idBusqueda.current;
       setBuscando(true);
@@ -68,7 +70,17 @@ export default function SelectorVariantes({
       });
       if (idActual !== idBusqueda.current) return;
       setBuscando(false);
-      if (error) { setResultados([]); return; }
+      if (error) {
+        // Antes se descartaba el error en silencio y solo se veía "Sin
+        // coincidencias" — indistinguible de una búsqueda real sin
+        // resultados. mensajeErrorBusqueda distingue si el problema es que
+        // falta aplicar una migración en el servidor (ver
+        // supabase/migration_013_busqueda_optimizada.sql) de un problema de red.
+        setResultados([]);
+        setMensajeError(mensajeErrorBusqueda(error));
+        return;
+      }
+      setMensajeError(null);
       setResultados((data as Producto[]) ?? []);
     }, 220);
     return () => clearTimeout(timer.current);
@@ -177,10 +189,13 @@ export default function SelectorVariantes({
           {q.trim().length >= 2 && (
             <ul className="relative z-30 mt-1.5 max-h-64 overflow-auto rounded-xl border border-pizarra-200 bg-white shadow-sastre-lg">
               {buscando && <li className="px-4 py-3 text-[13px] text-pizarra-400">Buscando…</li>}
-              {!buscando && resultados.length === 0 && (
+              {!buscando && mensajeError && (
+                <li className="px-4 py-3 text-[13px] font-medium leading-snug text-red-600">{mensajeError}</li>
+              )}
+              {!buscando && !mensajeError && resultados.length === 0 && (
                 <li className="px-4 py-3 text-[13px] text-pizarra-400">Sin coincidencias</li>
               )}
-              {!buscando && resultados.map((p) => (
+              {!buscando && !mensajeError && resultados.map((p) => (
                 <li key={p.id_producto}>
                   <button
                     type="button"
