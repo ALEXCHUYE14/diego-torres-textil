@@ -7,11 +7,16 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { DataTable, KpiCard, PageHeader } from '../components/ui';
 import { FilaInforme, InformeCierre, PeriodoBloqueado } from '../lib/types';
-import { hoyISO, moneda, numero } from '../utils/format';
+import { hoyISO, limitesFechaMovimiento, moneda, numero } from '../utils/format';
 
+// El inicio de mes actual, salvo que caiga antes del arranque de operación
+// del sistema (ej. en el primer mes de uso), caso en que se ancla ahí para
+// no ofrecer por defecto un rango con datos que nunca existieron.
 const inicioMes = (): string => {
   const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+  const base = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+  const { min } = limitesFechaMovimiento();
+  return base > min ? base : min;
 };
 
 const etiquetaMes = (anioMes: string): string => {
@@ -31,9 +36,15 @@ export default function Dashboard() {
   const [mesSeleccionado, setMesSeleccionado] = useState(() => hoyISO().slice(0, 7));
   const [procesandoPeriodo, setProcesandoPeriodo] = useState(false);
 
+  const limites = limitesFechaMovimiento();
+
   const actualizar = async (d = desde, h = hasta) => {
     if (!d || !h) { toast('aviso', 'Seleccione fecha de inicio y fin'); return; }
     if (d > h) { toast('error', 'La fecha inicial no puede ser posterior a la final'); return; }
+    if (d < limites.min || h > limites.max) {
+      toast('error', 'El rango debe estar dentro del período de operación del sistema');
+      return;
+    }
     setCargando(true);
     try {
       const { data, error } = await supabase.rpc('rpc_informe_cierre', { p_desde: d, p_hasta: h });
@@ -222,11 +233,19 @@ export default function Dashboard() {
         <div className="flex flex-col gap-3 md:flex-row md:items-end">
           <div className="flex-1">
             <label className="dt-label" htmlFor="f-desde">Fecha inicio</label>
-            <input id="f-desde" type="date" className="dt-input" value={desde} onChange={(e) => setDesde(e.target.value)} />
+            <input
+              id="f-desde" type="date" className="dt-input"
+              min={limites.min} max={limites.max}
+              value={desde} onChange={(e) => setDesde(e.target.value)}
+            />
           </div>
           <div className="flex-1">
             <label className="dt-label" htmlFor="f-hasta">Fecha fin</label>
-            <input id="f-hasta" type="date" className="dt-input" value={hasta} onChange={(e) => setHasta(e.target.value)} />
+            <input
+              id="f-hasta" type="date" className="dt-input"
+              min={limites.min} max={limites.max}
+              value={hasta} onChange={(e) => setHasta(e.target.value)}
+            />
           </div>
           <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap sm:gap-2.5">
             <button
