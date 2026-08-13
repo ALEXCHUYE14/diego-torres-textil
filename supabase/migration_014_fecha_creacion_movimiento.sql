@@ -17,11 +17,28 @@
 --  Solución: se agrega `fecha_creacion`, un timestamp real (instante del
 --  servidor al momento del INSERT, con default now()), independiente de
 --  `fecha_registro`. Los movimientos ya existentes no tienen forma de saber
---  su instante real de creación, así que se rellenan con su propio
---  `fecha_registro` como mejor aproximación disponible (ver nota del bloque
---  de backfill). De aquí en adelante, cada INSERT nuevo (que no menciona
---  esta columna) recibe automáticamente el instante real vía el DEFAULT —
---  no hace falta tocar las funciones rpc_registrar_entrada_lote/
+--  su instante real de creación (nunca se guardó), así que NO se rellenan
+--  copiando `fecha_registro` — hacerlo reproduce dos problemas a la vez:
+--   1) Semántico: `fecha_registro` es la fecha CONTABLE del movimiento (ej.
+--      01/03/2026 para la carga inicial de inventario), casi siempre muy
+--      anterior a cuándo se digitó de verdad ese movimiento en el sistema
+--      (aquí, en producción, desde julio 2026 en adelante). Copiarla haría
+--      ver "fecha de registro" 01/03/2026 para algo digitado en agosto.
+--   2) Zona horaria: `fecha_registro` se guarda como medianoche UTC
+--      EXPLÍCITA de un día de calendario (no es un instante real), pero
+--      `fecha_creacion` se muestra en el frontend con fechaSegura(), que
+--      lee en hora LOCAL. Medianoche UTC del 01/03/2026 cae en hora local
+--      de Colombia/Perú (UTC-5) el 28/02/2026 a las 19:00 — el mismo bug de
+--      un día atrás que ya se documentó y corrigió en la migración 006,
+--      reintroducido aquí por copiar un valor que no es un instante real.
+--  En vez de eso, se deja que el DEFAULT now() de la columna nueva asigne su
+--  propio valor a las filas existentes (Postgres evalúa `now()` una sola vez
+--  para todo el ALTER TABLE, así que todas las filas históricas quedan con
+--  la fecha/hora en que se corrió esta migración — un valor sincero: "no se
+--  sabe con exactitud cuándo se digitó cada una, se marca la fecha en que
+--  se activó esta trazabilidad"). De aquí en adelante, cada INSERT nuevo
+--  (que no menciona esta columna) recibe automáticamente el instante real
+--  vía el DEFAULT — no hace falta tocar rpc_registrar_entrada_lote/
 --  rpc_registrar_salida_lote/rpc_registrar_venta.
 --
 --  IMPORTANTE — no confundir en el frontend:
@@ -34,8 +51,8 @@
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------
--- 1. Columna nueva + backfill, protegidos para que la migración se pueda
---    volver a correr sin pisar datos reales ya capturados después del alta.
+-- 1. Columna nueva, protegida con "if not exists" para que el archivo se
+--    pueda volver a correr sin error si ya se había ejecutado antes.
 -- ----------------------------------------------------------------------------
 do $$
 begin
@@ -43,17 +60,11 @@ begin
     select 1 from information_schema.columns
     where table_name = 'historial_movimientos' and column_name = 'fecha_creacion'
   ) then
+    -- No se hace ningún UPDATE de backfill después de este ALTER: el propio
+    -- DEFAULT now() ya deja las filas existentes con la fecha/hora de esta
+    -- migración (ver nota arriba de por qué NO se copia fecha_registro).
     alter table historial_movimientos
       add column fecha_creacion timestamptz not null default now();
-
-    -- Backfill único: para los movimientos que ya existían antes de esta
-    -- migración no hay registro del instante real en que se digitaron, así
-    -- que se usa fecha_registro como mejor aproximación disponible (mismo
-    -- criterio que ya usaba fecha_registro para las salidas, que siempre se
-    -- guardaban con now()). Va DENTRO de este mismo "if" para que, si el
-    -- archivo se ejecuta una segunda vez por error, no vuelva a sobrescribir
-    -- los valores reales que ya se hayan acumulado desde el alta.
-    update historial_movimientos set fecha_creacion = fecha_registro;
   end if;
 end $$;
 
