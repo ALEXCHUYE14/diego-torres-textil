@@ -98,6 +98,9 @@ export interface Movimiento {
   tipo_movimiento: string;
   naturaleza: 'ENTRADA' | 'SALIDA';
   fecha_registro: string;
+  /** Instante real en que el movimiento se digitó en el sistema (distinto de
+   *  fecha_registro, que es el día de calendario elegido por el usuario). */
+  fecha_creacion: string;
   producto_id: string;
   cantidad: number;
   valor_unitario: number;
@@ -118,6 +121,9 @@ export interface MovimientoGeneral {
   tipo_movimiento: string;
   naturaleza: 'ENTRADA' | 'SALIDA';
   fecha_registro: string;
+  /** Instante real en que el movimiento se digitó en el sistema (distinto de
+   *  fecha_registro, que es el día de calendario elegido por el usuario). */
+  fecha_creacion: string;
   cantidad: number;
   valor_unitario: number;
   valor_total: number;

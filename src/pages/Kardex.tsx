@@ -147,7 +147,8 @@ export default function Kardex() {
             <DataTable<MovimientoGeneral & Record<string, unknown>>
               columnas={[
                 { clave: 'documento_numero', titulo: 'Documento', render: (m) => <span className="font-mono text-[12.5px]">{m.tipo_consecutivo}</span> },
-                { clave: 'fecha_registro', titulo: 'Fecha', render: (m) => fechaMovimiento(m.fecha_registro) },
+                { clave: 'fecha_registro', titulo: 'Fecha movimiento', render: (m) => fechaMovimiento(m.fecha_registro) },
+                { clave: 'fecha_creacion', titulo: 'Fecha de registro', render: (m) => fechaSegura(m.fecha_creacion) },
                 { clave: 'naturaleza', titulo: 'Tipo', render: (m) => (
                   <span className={`rounded-full px-2.5 py-0.5 text-[11.5px] font-bold ${m.naturaleza === 'ENTRADA' ? 'bg-emerald-50 text-emerald-700' : 'bg-borgona-50 text-borgona-600'}`}>
                     {m.tipo_movimiento} · {m.naturaleza}
@@ -222,7 +223,8 @@ export default function Kardex() {
                 <DataTable<Movimiento & Record<string, unknown>>
                   columnas={[
                     { clave: 'tipo_consecutivo', titulo: 'Consecutivo', render: (m) => <span className="font-mono text-[12.5px]">{m.tipo_consecutivo}</span> },
-                    { clave: 'fecha_registro', titulo: 'Fecha', render: (m) => fechaMovimiento(m.fecha_registro) },
+                    { clave: 'fecha_registro', titulo: 'Fecha movimiento', render: (m) => fechaMovimiento(m.fecha_registro) },
+                    { clave: 'fecha_creacion', titulo: 'Fecha de registro', render: (m) => fechaSegura(m.fecha_creacion) },
                     { clave: 'naturaleza', titulo: 'Tipo', render: (m) => (
                       <span className={`rounded-full px-2.5 py-0.5 text-[11.5px] font-bold ${m.naturaleza === 'ENTRADA' ? 'bg-emerald-50 text-emerald-700' : 'bg-borgona-50 text-borgona-600'}`}>
                         {m.tipo_movimiento} · {m.naturaleza}
