@@ -232,3 +232,13 @@ export const TIPOS_SALIDA = [
   { codigo: '2000', nombre: 'Salida a OP' },
   { codigo: '2003', nombre: 'Salida entrega cliente' },
 ];
+
+/**
+ * Tipo de movimiento especial (RE-09) para corregir el costo de un artículo
+ * ya existente en inventario, SIN modificar su stock — a diferencia de
+ * TIPOS_ENTRADA, nunca se ofrece en el formulario de Entradas (rpc_registrar_
+ * entrada_lote lo rechaza de forma explícita en el servidor). Tiene su
+ * propio RPC (rpc_corregir_valor_producto) y su propia pantalla, exclusiva
+ * de Administrador (ver src/pages/CorreccionValor.tsx).
+ */
+export const TIPO_CORRECCION_VALOR = { codigo: '9000', nombre: 'Corrección de valor de inventario' };

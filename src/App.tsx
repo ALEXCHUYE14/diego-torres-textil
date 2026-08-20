@@ -12,6 +12,7 @@ import Articulos from './pages/Articulos';
 import Catalogos from './pages/Catalogos';
 import Kardex from './pages/Kardex';
 import Usuarios from './pages/Usuarios';
+import CorreccionValor from './pages/CorreccionValor';
 
 function Rutas() {
   const { session, cargando } = useAuth();
@@ -44,6 +45,9 @@ function Rutas() {
         } />
         <Route path="/catalogos" element={
           <RutaProtegida rolesPermitidos={['administrador']}><Catalogos /></RutaProtegida>
+        } />
+        <Route path="/correccion-valor" element={
+          <RutaProtegida rolesPermitidos={['administrador']}><CorreccionValor /></RutaProtegida>
         } />
         <Route path="/kardex" element={<Kardex />} />
         <Route path="/usuarios" element={

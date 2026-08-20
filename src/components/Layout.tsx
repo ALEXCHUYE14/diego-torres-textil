@@ -2,7 +2,7 @@ import { ReactNode, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import {
   ArrowDownToLine, ArrowUpFromLine, LayoutDashboard, LibraryBig, LogOut,
-  PackageSearch, PanelLeftClose, PanelLeftOpen, Printer, ScanBarcode, Search, Users,
+  PackageSearch, PanelLeftClose, PanelLeftOpen, Printer, ScanBarcode, Search, Users, Wrench,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { etiquetaRol } from '../lib/types';
@@ -18,7 +18,9 @@ export default function Layout({ children }: { children: ReactNode }) {
   //    Almacén y Consulta).
   //  - Entradas, Salidas, Artículos e Imprimir: Operativo/Almacén y
   //    Administrador.
-  //  - Catálogos y Usuarios: exclusivos de Administrador.
+  //  - Catálogos, Corrección de valor y Usuarios: exclusivos de
+  //    Administrador (corregir el costo de un artículo es una operación
+  //    contable sensible, distinta de registrar entradas/salidas).
   // No basta con ocultar el link — la ruta también está protegida (ver
   // RutaProtegida en App.tsx) para que escribir la URL a mano no sirva de
   // nada.
@@ -30,7 +32,10 @@ export default function Layout({ children }: { children: ReactNode }) {
       { a: '/salidas', icono: ArrowUpFromLine, texto: 'Salidas' },
       { a: '/articulos', icono: ScanBarcode, texto: 'Artículos' },
     ] : []),
-    ...(esAdministrador ? [{ a: '/catalogos', icono: LibraryBig, texto: 'Catálogos' }] : []),
+    ...(esAdministrador ? [
+      { a: '/catalogos', icono: LibraryBig, texto: 'Catálogos' },
+      { a: '/correccion-valor', icono: Wrench, texto: 'Corr. Valor' },
+    ] : []),
     { a: '/kardex', icono: Search, texto: 'Kardex' },
     ...(esAdministrador ? [{ a: '/usuarios', icono: Users, texto: 'Usuarios' }] : []),
   ];
@@ -40,6 +45,7 @@ export default function Layout({ children }: { children: ReactNode }) {
   // una plantilla de string.
   const COLS_MOVIL: Record<number, string> = {
     3: 'grid-cols-3', 4: 'grid-cols-4', 5: 'grid-cols-5', 6: 'grid-cols-6', 7: 'grid-cols-7', 8: 'grid-cols-8',
+    9: 'grid-cols-9',
   };
   const colsMovil = COLS_MOVIL[nav.length] ?? 'grid-cols-7';
 

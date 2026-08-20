@@ -1,4 +1,4 @@
--- ============================================================================
+ -- ============================================================================
 --  DIEGO TORRES · Migración 013 — Motor de búsqueda unificado
 --  Ejecutar en el SQL Editor de Supabase después de la migración 012.
 --  Segura de volver a ejecutar (create extension/or replace/if not exists):
