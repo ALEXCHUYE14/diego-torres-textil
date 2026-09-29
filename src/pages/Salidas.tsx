@@ -118,7 +118,9 @@ export default function Salidas() {
       }
       toast('exito', `Salida guardada con éxito · Documento ${data.documento}`);
       try {
-        const { data: doc } = await supabase.rpc('rpc_obtener_documento', { p_tipo: 'SALIDA_ALMACEN', p_numero: data.documento });
+        const { data: doc, error: errorDoc } = await supabase.rpc('rpc_obtener_documento', { p_tipo: 'SALIDA_ALMACEN', p_numero: data.documento });
+        // supabase.rpc no lanza excepción ante un error: lo devuelve en `error`.
+        if (errorDoc || !doc) throw new Error(errorDoc?.message ?? 'Documento no encontrado');
         setDocumentoGuardado(doc as DocumentoMovimiento);
       } catch {
         toast('aviso', 'La salida se guardó, pero no se pudo cargar la vista de impresión. Búsquela desde Imprimir.');

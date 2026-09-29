@@ -127,7 +127,9 @@ export default function Entradas() {
       }
       toast('exito', `Entrada guardada con éxito · Documento ${data.documento}`);
       try {
-        const { data: doc } = await supabase.rpc('rpc_obtener_documento', { p_tipo: 'ENTRADA_ALMACEN', p_numero: data.documento });
+        const { data: doc, error: errorDoc } = await supabase.rpc('rpc_obtener_documento', { p_tipo: 'ENTRADA_ALMACEN', p_numero: data.documento });
+        // supabase.rpc no lanza excepción ante un error: lo devuelve en `error`.
+        if (errorDoc || !doc) throw new Error(errorDoc?.message ?? 'Documento no encontrado');
         setDocumentoGuardado(doc as DocumentoMovimiento);
       } catch {
         // La entrada ya se guardó correctamente; solo falló traer el documento para imprimir de inmediato.
