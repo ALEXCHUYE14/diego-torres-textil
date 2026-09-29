@@ -10,6 +10,16 @@
 --   4. RLS de periodos_bloqueados: consulta = lectura, operativo = bloquear/desbloquear
 -- ============================================================================
 
+-- Guarda: si la base ya tiene una migración posterior aplicada (existe
+-- rpc_registrar_entrada_lote), volver a correr esta reemplazaría funciones actuales por
+-- versiones antiguas. Se aborta antes de tocar nada.
+do $$
+begin
+  if exists (select 1 from pg_proc where proname = 'rpc_registrar_entrada_lote') then
+    raise exception 'La migración 002 ya fue superada por una posterior en esta base. NO la ejecute: use diagnostico_migraciones.sql para ver cuáles faltan.';
+  end if;
+end $$;
+
 -- ----------------------------------------------------------------------------
 -- 1. TABLA · periodos_bloqueados (cierre contable mensual)
 --    p_anio_mes se normaliza siempre al primer día del mes (date_trunc).

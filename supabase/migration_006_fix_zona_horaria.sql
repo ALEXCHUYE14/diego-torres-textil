@@ -26,6 +26,16 @@
 --      convertido.
 -- ============================================================================
 
+-- Guarda: si la base ya tiene una migración posterior aplicada (existe
+-- fn_es_administrador), volver a correr esta reemplazaría funciones actuales por
+-- versiones antiguas. Se aborta antes de tocar nada.
+do $$
+begin
+  if exists (select 1 from pg_proc where proname = 'fn_es_administrador') then
+    raise exception 'La migración 006 ya fue superada por una posterior en esta base. NO la ejecute: use diagnostico_migraciones.sql para ver cuáles faltan.';
+  end if;
+end $$;
+
 -- ----------------------------------------------------------------------------
 -- 1. fn_verificar_periodo_abierto · ahora trabaja con DATE, no timestamptz
 -- ----------------------------------------------------------------------------
