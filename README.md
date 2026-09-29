@@ -7,16 +7,17 @@ Sistema integral para empresa del sector textil: entradas y salidas de almacén 
 ## 1. Configurar Supabase
 
 1. Cree un proyecto en [supabase.com](https://supabase.com).
-2. Abra **SQL Editor** y ejecute completo el archivo `supabase/schema.sql`. Esto crea tablas, funciones RPC transaccionales, políticas RLS y los datos semilla (familias textiles 01000–15000 y proveedores demo).
-   **Solo en una base nueva:** si la base ya existe, `schema.sql` se detiene con un aviso para no reemplazar funciones actualizadas.
-   Luego ejecute, uno por uno y en orden, `supabase/migration_002_...sql` hasta `supabase/migration_016_...sql`.
-   `reset_inventario_prueba.sql` **no** forma parte de la instalación: borra todo el inventario.
+2. Abra **SQL Editor** y ejecute **solo estos archivos**:
+   - **Base nueva:** `supabase/schema.sql` y después `supabase/actualizar_base.sql`.
+   - **Base que ya está en uso:** solo `supabase/actualizar_base.sql`. Se puede volver a ejecutar cuando quiera sin dañar datos: no reinicia consecutivos ni cambia roles existentes.
+
+   No ejecute los archivos de `supabase/historial_migraciones/` (ya están incluidos en `actualizar_base.sql`). `supabase/herramientas/reset_inventario_prueba.sql` **borra todo el inventario**: no forma parte de la instalación.
 3. En **Authentication → Providers**, verifique que Email esté habilitado.
 4. Cree su primer usuario en **Authentication → Users → Add user** (correo + contraseña). El trigger le asigna automáticamente el rol `consulta`.
-5. Para darle rol operativo (escritura), ejecute en SQL Editor:
+5. Para darle a un usuario el rol `administrador` (control total; también existen `operativo` y `consulta`), ejecute en SQL Editor:
 
 ```sql
-update usuarios set rol = 'operativo'
+update usuarios set rol = 'administrador'
 where id_usuario = (select id from auth.users where email = 'SU_CORREO');
 ```
 
@@ -54,7 +55,8 @@ La vista de impresión fija el ancho de página a 80mm sin márgenes del navegad
 ## 6. Estructura
 
 ```
-supabase/schema.sql        Base de datos completa (tablas, RPCs, RLS, seeds)
+supabase/schema.sql        Base inicial (solo en una base nueva)
+supabase/actualizar_base.sql  Lleva la base al estado final (siempre)
 src/
   lib/        supabase.ts (cliente) · types.ts (dominio)
   context/    AuthContext (sesión + rol) · ToastContext

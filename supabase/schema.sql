@@ -4,8 +4,8 @@
 --  Incluye: tablas, contadores anti-colisión, RPCs transaccionales con
 --  bloqueo de stock, costo promedio ponderado (CPP), RLS por rol y seeds.
 --
---  SOLO para una base de datos NUEVA. Después de este archivo hay que
---  ejecutar, en orden, migration_002 ... migration_016 (ver README.md).
+--  SOLO para una base de datos NUEVA. Después de este archivo ejecute
+--  supabase/actualizar_base.sql (ver README.md).
 -- ============================================================================
 
 -- Guarda: si la base ya tiene aplicadas las migraciones (existe
@@ -16,7 +16,7 @@
 do $$
 begin
   if exists (select 1 from pg_proc where proname = 'rpc_registrar_entrada_lote') then
-    raise exception 'Esta base de datos ya está inicializada y migrada. NO ejecute schema.sql: ejecute solo las migraciones que falten (ver README.md).';
+    raise exception 'Esta base de datos ya está inicializada y migrada. NO ejecute schema.sql: ejecute solo supabase/actualizar_base.sql.';
   end if;
 end $$;
 

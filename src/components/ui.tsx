@@ -82,7 +82,7 @@ export function BuscadorProducto({
     timer.current = setTimeout(async () => {
       const idActual = ++idBusqueda.current;
       // Búsqueda centralizada en el servidor (rpc_buscar_productos, ver
-      // supabase/migration_013_busqueda_optimizada.sql): parte el término en
+      // supabase/historial_migraciones/migration_013_busqueda_optimizada.sql): parte el término en
       // palabras y exige que cada una aparezca en ALGÚN campo visible del
       // artículo (nombre, código, género, color, talla) — no necesariamente
       // el mismo campo, así "chaqueta negro" encuentra nombre="CHAQUETA
@@ -105,7 +105,7 @@ export function BuscadorProducto({
         // extensión de búsqueda configurada" (falta aplicar una migración)
         // de un problema real de red — antes ambos casos mostraban el mismo
         // "verifique su conexión", lo que llevaba a diagnosticar mal la
-        // causa (ver supabase/migration_013_busqueda_optimizada.sql).
+        // causa (ver supabase/historial_migraciones/migration_013_busqueda_optimizada.sql).
         const msg = mensajeErrorBusqueda(error);
         setResultados([]);
         setMensajeError(msg);

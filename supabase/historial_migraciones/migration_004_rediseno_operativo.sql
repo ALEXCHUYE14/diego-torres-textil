@@ -26,7 +26,7 @@
 do $$
 begin
   if exists (select 1 from pg_proc where proname = 'fn_es_administrador') then
-    raise exception 'La migración 004 ya fue superada por una posterior en esta base. NO la ejecute: use diagnostico_migraciones.sql para ver cuáles faltan.';
+    raise exception 'La migración 004 ya fue superada por una posterior en esta base. NO la ejecute: use supabase/actualizar_base.sql.';
   end if;
 end $$;
 

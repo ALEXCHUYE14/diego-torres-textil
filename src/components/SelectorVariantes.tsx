@@ -75,7 +75,7 @@ export default function SelectorVariantes({
         // coincidencias" — indistinguible de una búsqueda real sin
         // resultados. mensajeErrorBusqueda distingue si el problema es que
         // falta aplicar una migración en el servidor (ver
-        // supabase/migration_013_busqueda_optimizada.sql) de un problema de red.
+        // supabase/historial_migraciones/migration_013_busqueda_optimizada.sql) de un problema de red.
         setResultados([]);
         setMensajeError(mensajeErrorBusqueda(error));
         return;

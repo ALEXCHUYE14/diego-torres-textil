@@ -1,6 +1,6 @@
 // Utilidades de búsqueda · usadas por el catálogo (Articulos.tsx, Maestro.tsx,
 // filtrado en memoria) y espejadas en el servidor por fn_normalizar /
-// rpc_buscar_productos (supabase/migration_013_busqueda_optimizada.sql) para
+// rpc_buscar_productos (supabase/historial_migraciones/migration_013_busqueda_optimizada.sql) para
 // que el buscador con autocompletado (BuscadorProducto) se comporte igual.
 import { Producto } from '../lib/types';
 
@@ -57,7 +57,7 @@ export function coincideProducto(
 /**
  * Filtra una lista de productos por texto libre, con la misma tolerancia que
  * rpc_buscar_productos en el servidor (ver
- * supabase/migration_013_busqueda_optimizada.sql): primero exige que TODAS
+ * supabase/historial_migraciones/migration_013_busqueda_optimizada.sql): primero exige que TODAS
  * las palabras coincidan (preciso); si eso no devuelve nada, cae a
  * coincidencia parcial (basta con que UNA palabra coincida) ordenada por
  * cuántas palabras coincidieron. Sin este segundo intento, una búsqueda con
@@ -90,7 +90,7 @@ export function filtrarProductos<T extends CamposProducto>(
 /**
  * Traduce el error de supabase.rpc('rpc_buscar_productos', ...) a un mensaje
  * accionable. Si la función/extensión no está creada en el servidor (falta
- * aplicar supabase/migration_013_busqueda_optimizada.sql, o quedó aplicada a
+ * aplicar supabase/historial_migraciones/migration_013_busqueda_optimizada.sql, o quedó aplicada a
  * medias — ver el comentario de bug en ese archivo), PostgREST responde con
  * "Could not find the function..." (código PGRST202) o, si la función existe
  * pero unaccent() no resuelve en su search_path, con un error interno de
@@ -106,7 +106,7 @@ export function mensajeErrorBusqueda(error: { message?: string; code?: string } 
     /unaccent/i.test(msg) ||
     /function .* does not exist/i.test(msg);
   if (noConfigurada) {
-    return 'La búsqueda no está disponible: falta aplicar la migración de base de datos "migration_013_busqueda_optimizada.sql" en Supabase. Contacte al administrador del sistema.';
+    return 'La búsqueda no está disponible: falta ejecutar "supabase/actualizar_base.sql" en Supabase. Contacte al administrador del sistema.';
   }
   return 'No se pudo buscar productos. Verifique su conexión e intente de nuevo.';
 }
