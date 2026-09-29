@@ -8,6 +8,9 @@ Sistema integral para empresa del sector textil: entradas y salidas de almacén 
 
 1. Cree un proyecto en [supabase.com](https://supabase.com).
 2. Abra **SQL Editor** y ejecute completo el archivo `supabase/schema.sql`. Esto crea tablas, funciones RPC transaccionales, políticas RLS y los datos semilla (familias textiles 01000–15000 y proveedores demo).
+   **Solo en una base nueva:** si la base ya existe, `schema.sql` se detiene con un aviso para no reemplazar funciones actualizadas.
+   Luego ejecute, uno por uno y en orden, `supabase/migration_002_...sql` hasta `supabase/migration_016_...sql`.
+   `reset_inventario_prueba.sql` **no** forma parte de la instalación: borra todo el inventario.
 3. En **Authentication → Providers**, verifique que Email esté habilitado.
 4. Cree su primer usuario en **Authentication → Users → Add user** (correo + contraseña). El trigger le asigna automáticamente el rol `consulta`.
 5. Para darle rol operativo (escritura), ejecute en SQL Editor:

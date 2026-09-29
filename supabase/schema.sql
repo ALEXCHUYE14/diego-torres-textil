@@ -3,7 +3,22 @@
 --  Schema PostgreSQL para Supabase — ejecutar completo en SQL Editor
 --  Incluye: tablas, contadores anti-colisión, RPCs transaccionales con
 --  bloqueo de stock, costo promedio ponderado (CPP), RLS por rol y seeds.
+--
+--  SOLO para una base de datos NUEVA. Después de este archivo hay que
+--  ejecutar, en orden, migration_002 ... migration_016 (ver README.md).
 -- ============================================================================
+
+-- Guarda: si la base ya tiene aplicadas las migraciones (existe
+-- rpc_registrar_entrada_lote, creada en la migración 004), volver a correr
+-- este archivo reemplazaría las funciones actuales por sus versiones
+-- originales (sin rol Administrador, sin cierre de mes, etc.). Se aborta
+-- antes de tocar nada.
+do $$
+begin
+  if exists (select 1 from pg_proc where proname = 'rpc_registrar_entrada_lote') then
+    raise exception 'Esta base de datos ya está inicializada y migrada. NO ejecute schema.sql: ejecute solo las migraciones que falten (ver README.md).';
+  end if;
+end $$;
 
 -- ----------------------------------------------------------------------------
 -- 1. TABLAS MAESTRAS
