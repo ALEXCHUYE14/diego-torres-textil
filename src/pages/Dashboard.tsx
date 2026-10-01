@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Eraser, FileDown, Lock, RefreshCcw, Unlock } from 'lucide-react';
+import { DatabaseBackup, Eraser, FileDown, Lock, RefreshCcw, Unlock } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { supabase } from '../lib/supabase';
@@ -8,6 +8,7 @@ import { useToast } from '../context/ToastContext';
 import { DataTable, KpiCard, PageHeader } from '../components/ui';
 import { FilaInforme, InformeCierre, PeriodoBloqueado } from '../lib/types';
 import { hoyISO, limitesFechaMovimiento, moneda, numero } from '../utils/format';
+import { descargarRespaldoExcel } from '../utils/respaldo';
 
 // El inicio de mes actual, salvo que caiga antes del arranque de operación
 // del sistema (ej. en el primer mes de uso), caso en que se ancla ahí para
@@ -26,7 +27,7 @@ const etiquetaMes = (anioMes: string): string => {
 
 export default function Dashboard() {
   const { toast } = useToast();
-  const { esAdministrador } = useAuth();
+  const { esAdministrador, nombre } = useAuth();
   const [desde, setDesde] = useState(inicioMes());
   const [hasta, setHasta] = useState(hoyISO());
   const [informe, setInforme] = useState<InformeCierre | null>(null);
@@ -35,6 +36,23 @@ export default function Dashboard() {
   const [periodos, setPeriodos] = useState<PeriodoBloqueado[]>([]);
   const [mesSeleccionado, setMesSeleccionado] = useState(() => hoyISO().slice(0, 7));
   const [procesandoPeriodo, setProcesandoPeriodo] = useState(false);
+  const [respaldando, setRespaldando] = useState(false);
+
+  const generarRespaldo = async () => {
+    setRespaldando(true);
+    try {
+      const { archivo, fallidas } = await descargarRespaldoExcel(nombre || 'Administrador');
+      if (fallidas.length > 0) {
+        toast('aviso', `Respaldo descargado (${archivo}), pero no se pudieron leer: ${fallidas.join(', ')}. Revise la hoja Resumen.`);
+      } else {
+        toast('exito', `Respaldo descargado: ${archivo}`);
+      }
+    } catch {
+      toast('error', 'No se pudo generar el respaldo. Verifique su conexión e intente de nuevo.');
+    } finally {
+      setRespaldando(false);
+    }
+  };
 
   const limites = limitesFechaMovimiento();
 
@@ -167,6 +185,18 @@ export default function Dashboard() {
       <PageHeader
         titulo="Informe de cierre"
         subtitulo="Panel consolidado de inventario · reemplaza el cierre manual en Excel"
+        extra={esAdministrador && (
+          <button
+            type="button"
+            className="dt-btn dt-btn-ghost"
+            onClick={generarRespaldo}
+            disabled={respaldando}
+            title="Descarga toda la base de datos del inventario en un archivo Excel (una hoja por tabla)"
+          >
+            <DatabaseBackup size={17} className={respaldando ? 'animate-pulse' : ''} />
+            {respaldando ? 'Generando respaldo…' : 'Respaldo Excel'}
+          </button>
+        )}
       />
 
       {/* -------- Control de cierre / bloqueo de mes -------- */}
