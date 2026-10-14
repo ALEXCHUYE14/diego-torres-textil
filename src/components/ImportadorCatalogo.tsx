@@ -78,6 +78,82 @@ function buscarFamilia(familias: Familia[], texto: string): { familia: Familia }
   return { error: `Familia "${texto}" no existe. Familias disponibles: ${lista || '(ninguna — créelas en Catálogos)'}` };
 }
 
+// Misma identidad que el índice único uq_productos_atributos_activos del
+// servidor: familia + nombre + género + color + talla (vacío = NULL).
+const claveArticulo = (idFamilia: string, nombre: string, genero: string | null, color: string | null, talla: string | null) =>
+  [idFamilia, nombre, genero ?? '', color ?? '', talla ?? ''].map((v) => v.trim().toUpperCase()).join('|');
+
+interface ProductoExistente {
+  codigo_barra: string;
+  nombre: string;
+  genero: string | null;
+  color: string | null;
+  talla: string | null;
+  id_familia: string;
+  activo: boolean;
+}
+
+async function consultarEnLotes(columna: 'codigo_barra' | 'nombre', valores: string[]): Promise<ProductoExistente[]> {
+  const unicos = [...new Set(valores)];
+  const resultado: ProductoExistente[] = [];
+  // Lotes de 100: la lista viaja en la URL de la consulta y no debe crecer sin límite.
+  for (let i = 0; i < unicos.length; i += 100) {
+    const { data, error } = await supabase
+      .from('productos')
+      .select('codigo_barra, nombre, genero, color, talla, id_familia, activo')
+      .in(columna, unicos.slice(i, i + 100));
+    if (error) throw new Error(error.message);
+    resultado.push(...((data as ProductoExistente[]) ?? []));
+  }
+  return resultado;
+}
+
+/**
+ * Revisa ANTES de importar las dos condiciones que el servidor rechaza con
+ * un mismo mensaje genérico ("ya existe ... el código o el mismo nombre/
+ * género/color/talla"), para decirle al usuario exactamente qué artículo
+ * choca: (1) el código ya existe, aunque el artículo esté inactivo; (2) ya
+ * hay OTRO artículo activo con la misma familia, nombre, género, color y
+ * talla, con otro código; o (3) dos filas del mismo archivo describen el
+ * mismo artículo.
+ */
+async function verificarContraCatalogo(filas: FilaValida[]): Promise<{ validas: FilaValida[]; invalidas: FilaInvalida[] }> {
+  const porCodigo = new Map((await consultarEnLotes('codigo_barra', filas.map((f) => f.codigo))).map((p) => [p.codigo_barra.toUpperCase(), p]));
+  const activosPorClave = new Map(
+    (await consultarEnLotes('nombre', filas.map((f) => f.nombre.trim().toUpperCase())))
+      .filter((p) => p.activo)
+      .map((p) => [claveArticulo(p.id_familia, p.nombre, p.genero, p.color, p.talla), p])
+  );
+
+  const validas: FilaValida[] = [];
+  const invalidas: FilaInvalida[] = [];
+  const filaPorClave = new Map<string, number>();
+  for (const f of filas) {
+    const clave = claveArticulo(f.id_familia, f.nombre, f.genero || null, f.color || null, f.talla || null);
+    const mismoCodigo = porCodigo.get(f.codigo);
+    const mismoArticulo = activosPorClave.get(clave);
+    const filaPrevia = filaPorClave.get(clave);
+    if (mismoCodigo) {
+      invalidas.push({
+        fila: f.fila,
+        motivo: `${f.codigo}: el código ya existe en el catálogo (artículo "${mismoCodigo.nombre}", ${mismoCodigo.activo ? 'activo' : 'INACTIVO'}).`
+          + (mismoCodigo.activo ? '' : ' Actívelo desde Artículos en vez de volver a cargarlo.'),
+      });
+    } else if (mismoArticulo) {
+      invalidas.push({
+        fila: f.fila,
+        motivo: `${f.codigo}: ya existe el mismo artículo con otro código, ${mismoArticulo.codigo_barra} ("${mismoArticulo.nombre}"): misma familia, nombre, género, color y talla. Cambie algún dato o use ese código.`,
+      });
+    } else if (filaPrevia !== undefined) {
+      invalidas.push({ fila: f.fila, motivo: `${f.codigo}: repite el artículo de la fila ${filaPrevia} (misma familia, nombre, género, color y talla).` });
+    } else {
+      filaPorClave.set(clave, f.fila);
+      validas.push(f);
+    }
+  }
+  return { validas, invalidas };
+}
+
 function normalizarClave(clave: string): string {
   return clave.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 }
@@ -224,9 +300,23 @@ export default function ImportadorCatalogo({
         });
       });
 
-      setValidas(buenas);
-      setInvalidas(malas);
-      if (buenas.length === 0) {
+      let buenasFinales = buenas;
+      let malasFinales = malas;
+      if (buenas.length > 0) {
+        try {
+          const revision = await verificarContraCatalogo(buenas);
+          buenasFinales = revision.validas;
+          malasFinales = [...malas, ...revision.invalidas].sort((a, b) => a.fila - b.fila);
+        } catch {
+          // Sin conexión para la revisión previa: se sigue igual, el servidor
+          // vuelve a validar cada fila al importar y reporta el error ahí.
+          toast('aviso', 'No se pudo verificar contra el catálogo actual; los duplicados se reportarán al importar.');
+        }
+      }
+
+      setValidas(buenasFinales);
+      setInvalidas(malasFinales);
+      if (buenasFinales.length === 0) {
         toast('aviso', 'Ninguna fila pasó la validación. Revise el detalle de errores.');
       }
     } catch {
