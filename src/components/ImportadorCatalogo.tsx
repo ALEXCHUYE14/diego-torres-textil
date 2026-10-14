@@ -176,6 +176,23 @@ function parsearNumero(textoOriginal: string): number {
   return parseFloat(texto.replace(/[.,]/g, ''));
 }
 
+// Lista de filas rechazadas (número de fila del archivo + motivo) para
+// corregirlas sin tener que buscarlas a ojo entre cientos de filas.
+function descargarRechazadas(invalidas: FilaInvalida[]) {
+  const escapar = (t: string) => `"${t.replace(/"/g, '""')}"`;
+  const contenido = ['fila;motivo', ...invalidas.map((f) => `${f.fila};${escapar(f.motivo)}`)].join('\n') + '\n';
+  // BOM para que Excel abra las tildes correctamente.
+  const blob = new Blob(['﻿' + contenido], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'filas_rechazadas_carga_masiva.csv';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 function descargarPlantilla() {
   const encabezado = 'codigo,familia,nombre,genero,color,talla,saldo_inicial,valor_inicial\n';
   const ejemplo1 = 'BAT-001,BATA,BATA CLINICA,UNISEX,BLANCO,M,25,38500\n';
@@ -359,12 +376,15 @@ export default function ImportadorCatalogo({
     setResultado(res);
     setImportando(false);
     const creados = res.filter((r) => r.ok).length;
-    const fallidos = res.length - creados;
+    // Las filas rechazadas en la revisión del archivo (familia inexistente,
+    // código repetido, etc.) nunca llegan a `res`: hay que sumarlas aquí o
+    // el mensaje final dice "completa" aunque parte del archivo no se cargó.
+    const fallidos = res.length - creados + invalidas.length;
     if (creados > 0) onCompletado?.();
     if (fallidos === 0) {
       toast('exito', `Carga masiva completa: ${creados} artículo(s) cargado(s) con su saldo inicial`);
     } else {
-      toast('aviso', `Carga masiva: ${creados} cargado(s), ${fallidos} con error`);
+      toast('aviso', `Carga masiva: ${creados} cargado(s), ${fallidos} NO cargado(s). Revise el detalle en rojo.`);
     }
   };
 
@@ -434,8 +454,24 @@ export default function ImportadorCatalogo({
           </div>
         )}
 
+        {invalidas.length > 0 && !analizando && (
+          <div className="mt-3 flex flex-col gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5 text-[12.5px] text-amber-800 sm:flex-row sm:items-center sm:justify-between">
+            <span>
+              <strong>{invalidas.length} de {validas.length + invalidas.length} fila(s) del archivo NO se cargarán.</strong>{' '}
+              Corríjalas y vuelva a subir solo esas filas.
+            </span>
+            <button type="button" onClick={() => descargarRechazadas(invalidas)} className="inline-flex shrink-0 items-center gap-1.5 font-semibold text-amber-900 hover:underline">
+              <Download size={14} /> Descargar lista
+            </button>
+          </div>
+        )}
+
         {resultado && (
           <div className="mt-4 max-h-48 overflow-auto rounded-lg border border-pizarra-200">
+            <p className="sticky top-0 border-b border-pizarra-200 bg-pizarra-50 px-3 py-2 text-[12.5px] font-semibold text-pizarra-600">
+              Resultado: {resultado.filter((r) => r.ok).length} cargado(s) · {resultado.filter((r) => !r.ok).length} con error al cargar
+              {invalidas.length > 0 && ` · ${invalidas.length} rechazado(s) en la revisión del archivo`}
+            </p>
             <ul className="divide-y divide-pizarra-100">
               {resultado.map((r) => (
                 <li key={r.fila} className={`px-3 py-2 text-[12.5px] ${r.ok ? 'text-emerald-700' : 'text-red-600'}`}>
@@ -453,7 +489,9 @@ export default function ImportadorCatalogo({
         <div className="mt-5 flex justify-end gap-3">
           <button type="button" className="dt-btn dt-btn-ghost" onClick={cerrar} disabled={importando}>Cerrar</button>
           <button type="button" className="dt-btn dt-btn-primary" disabled={validas.length === 0 || importando || deshabilitado} onClick={importar}>
-            <Upload size={16} /> {importando ? 'Importando…' : `Importar ${validas.length || ''} artículo(s)`}
+            <Upload size={16} /> {importando ? 'Importando…' : invalidas.length > 0
+              ? `Importar ${validas.length} de ${validas.length + invalidas.length}`
+              : `Importar ${validas.length || ''} artículo(s)`}
           </button>
         </div>
       </div>
