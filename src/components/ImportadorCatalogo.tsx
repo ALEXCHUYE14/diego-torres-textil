@@ -4,6 +4,7 @@ import { CheckCircle2, Download, FileSpreadsheet, Upload, X, XCircle } from 'luc
 import { supabase } from '../lib/supabase';
 import { useToast } from '../context/ToastContext';
 import { Familia } from '../lib/types';
+import { normalizarTexto } from '../utils/busqueda';
 
 const COLUMNAS_REQUERIDAS = ['codigo', 'familia', 'nombre'] as const;
 
@@ -32,6 +33,49 @@ interface ResultadoFila {
   fila: number;
   ok: boolean;
   detalle: string;
+}
+
+// Raíz de un nombre de familia para comparar sin importar singular/plural:
+// "MATERIA PRIMA" y "MATERIAS PRIMAS", "CHAQUETA" y "CHAQUETAS",
+// "PANTALON" y "PANTALONES" dan la misma raíz. Se aplica igual a los dos
+// lados de la comparación, así que no importa que la raíz no sea una
+// palabra real (ej. "GRIS" → "GRI").
+function raizFamilia(texto: string): string {
+  return normalizarTexto(texto)
+    .split(' ')
+    .map((p) => {
+      if (p.length > 4 && p.endsWith('ES') && !'AEIOU'.includes(p[p.length - 3])) return p.slice(0, -2);
+      if (p.length > 3 && p.endsWith('S')) return p.slice(0, -1);
+      return p;
+    })
+    .join(' ');
+}
+
+/**
+ * Busca la familia escrita en el archivo, de la coincidencia más estricta a
+ * la más tolerante: código exacto → nombre exacto → nombre sin tildes ni
+ * espacios de más → singular/plural. En los pasos tolerantes solo se acepta
+ * si hay UNA sola familia candidata; si hay varias se rechaza la fila en vez
+ * de adivinar (cargar un artículo en la familia equivocada es peor que
+ * pedir que se corrija el archivo).
+ */
+function buscarFamilia(familias: Familia[], texto: string): { familia: Familia } | { error: string } {
+  const t = texto.trim().toLowerCase();
+  const exacta = familias.find((f) => f.codigo.toLowerCase() === t) ?? familias.find((f) => f.nombre.toLowerCase() === t);
+  if (exacta) return { familia: exacta };
+
+  for (const clave of [normalizarTexto, raizFamilia]) {
+    const buscada = clave(texto);
+    const candidatas = familias.filter((f) => clave(f.nombre) === buscada);
+    if (candidatas.length === 1) return { familia: candidatas[0] };
+    if (candidatas.length > 1) {
+      return { error: `Familia "${texto}" es ambigua: coincide con ${candidatas.map((f) => `"${f.nombre}" (${f.codigo})`).join(', ')}. Escriba el código de la familia.` };
+    }
+  }
+
+  const disponibles = [...familias].sort((a, b) => a.nombre.localeCompare(b.nombre)).map((f) => f.nombre);
+  const lista = disponibles.length > 25 ? `${disponibles.slice(0, 25).join(', ')}…` : disponibles.join(', ');
+  return { error: `Familia "${texto}" no existe. Familias disponibles: ${lista || '(ninguna — créelas en Catálogos)'}` };
 }
 
 function normalizarClave(clave: string): string {
@@ -155,12 +199,12 @@ export default function ImportadorCatalogo({
         if (!nombre) { malas.push({ fila: numFila, motivo: 'Falta el nombre' }); return; }
         if (!familiaTexto) { malas.push({ fila: numFila, motivo: 'Falta la familia' }); return; }
 
-        const fam = familias.find((f) => f.codigo.toLowerCase() === familiaTexto.toLowerCase())
-          ?? familias.find((f) => f.nombre.toLowerCase() === familiaTexto.toLowerCase());
-        if (!fam) {
-          malas.push({ fila: numFila, motivo: `Familia "${familiaTexto}" no existe (use el código o nombre exacto)` });
+        const busqueda = buscarFamilia(familias, familiaTexto);
+        if ('error' in busqueda) {
+          malas.push({ fila: numFila, motivo: `${codigo}: ${busqueda.error}` });
           return;
         }
+        const fam = busqueda.familia;
 
         const saldoInicial = parsearNumero(saldoTexto);
         if (isNaN(saldoInicial) || saldoInicial < 0) {
