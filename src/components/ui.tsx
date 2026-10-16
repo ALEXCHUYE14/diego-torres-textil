@@ -117,7 +117,7 @@ export function BuscadorProducto({
       setResultados((data as Producto[]) ?? []);
       setAbierto(true);
       setCursor(-1);
-    }, 220);
+    }, 400); // espera a que el usuario deje de escribir: menos consultas (y logs) en Supabase
     return () => clearTimeout(timer.current);
   }, [q, soloActivos, toast]);
 

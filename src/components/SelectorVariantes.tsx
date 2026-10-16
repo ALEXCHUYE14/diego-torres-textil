@@ -82,7 +82,7 @@ export default function SelectorVariantes({
       }
       setMensajeError(null);
       setResultados((data as Producto[]) ?? []);
-    }, 220);
+    }, 400); // espera a que el usuario deje de escribir: menos consultas (y logs) en Supabase
     return () => clearTimeout(timer.current);
   }, [q]);
 
