@@ -96,6 +96,10 @@ export async function descargarRespaldoExcel(generadoPor: string): Promise<{ arc
     [],
     ['Hoja / tabla', 'Contenido', 'Filas', 'Estado'],
     ...resultados.map(({ t, filas, error }) => [t.tabla, t.descripcion, error ? null : filas.length, error ? `ERROR: ${error}` : 'Completa']),
+    [],
+    ['Fechas en historial_movimientos'],
+    ['fecha_registro', 'Fecha contable del movimiento: el día elegido al registrarlo (o la fecha del saldo inicial en la carga masiva). Se guarda como medianoche UTC: 2026-10-14T00:00:00+00:00 = 14/10/2026.'],
+    ['fecha_creacion', 'Fecha y hora real (UTC) en que el movimiento se digitó en el sistema. Hora Colombia = UTC − 5 h.'],
   ];
   const hojaResumen = XLSX.utils.aoa_to_sheet(resumen);
   hojaResumen['!cols'] = [{ wch: 24 }, { wch: 44 }, { wch: 10 }, { wch: 40 }];

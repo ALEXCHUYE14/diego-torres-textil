@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import { useToast } from '../context/ToastContext';
 import { Familia } from '../lib/types';
 import { normalizarTexto } from '../utils/busqueda';
+import { hoyISO, limitesFechaMovimiento } from '../utils/format';
 
 const COLUMNAS_REQUERIDAS = ['codigo', 'familia', 'nombre'] as const;
 
@@ -229,6 +230,10 @@ export default function ImportadorCatalogo({
   const [importando, setImportando] = useState(false);
   const [progreso, setProgreso] = useState({ hecho: 0, total: 0 });
   const [resultado, setResultado] = useState<ResultadoFila[] | null>(null);
+  // Fecha contable con la que quedan los saldos iniciales en el kardex
+  // (antes era siempre 01/03/2026, aunque la carga se hiciera otro día).
+  const [fechaSaldo, setFechaSaldo] = useState(hoyISO);
+  const limitesFecha = limitesFechaMovimiento();
 
   const reiniciar = () => {
     setNombreArchivo(''); setValidas([]); setInvalidas([]); setResultado(null);
@@ -345,13 +350,23 @@ export default function ImportadorCatalogo({
 
   const importar = async () => {
     if (validas.length === 0) return;
+    if (!fechaSaldo || fechaSaldo < limitesFecha.min || fechaSaldo > limitesFecha.max) {
+      toast('error', 'Seleccione una fecha del saldo inicial válida (desde el 01/03/2026 hasta hoy).');
+      return;
+    }
     setImportando(true);
+    // Si la base de datos todavía no tiene la versión con p_fecha (falta
+    // ejecutar actualizar_base.sql), PostgREST responde PGRST202 en cada
+    // fila. En ese caso se reintenta sin la fecha (comportamiento anterior)
+    // en vez de dejar fallar toda la carga.
+    let enviarFecha = true;
+    let avisoSinFecha = false;
     setProgreso({ hecho: 0, total: validas.length });
     const res: ResultadoFila[] = [];
 
     for (const fila of validas) {
       try {
-        const { data, error } = await supabase.rpc('rpc_importar_articulo_inicial', {
+        const parametros = {
           p_codigo_barra: fila.codigo,
           p_nombre: fila.nombre,
           p_id_familia: fila.id_familia,
@@ -360,7 +375,14 @@ export default function ImportadorCatalogo({
           p_talla: fila.talla || null,
           p_saldo_inicial: fila.saldoInicial,
           p_valor_inicial: fila.valorInicial,
-        });
+        };
+        let { data, error } = await supabase.rpc('rpc_importar_articulo_inicial',
+          enviarFecha ? { ...parametros, p_fecha: fechaSaldo } : parametros);
+        if (error?.code === 'PGRST202' && enviarFecha) {
+          enviarFecha = false;
+          avisoSinFecha = true;
+          ({ data, error } = await supabase.rpc('rpc_importar_articulo_inicial', parametros));
+        }
         if (error) {
           const msg = error.code === '23505' ? `El código "${fila.codigo}" ya existe en el catálogo` : error.message;
           res.push({ fila: fila.fila, ok: false, detalle: msg });
@@ -375,6 +397,9 @@ export default function ImportadorCatalogo({
 
     setResultado(res);
     setImportando(false);
+    if (avisoSinFecha) {
+      toast('aviso', 'La base de datos no está actualizada: los saldos iniciales quedaron con la fecha anterior (01/03/2026). Ejecute supabase/actualizar_base.sql.');
+    }
     const creados = res.filter((r) => r.ok).length;
     // Las filas rechazadas en la revisión del archivo (familia inexistente,
     // código repetido, etc.) nunca llegan a `res`: hay que sumarlas aquí o
@@ -421,6 +446,18 @@ export default function ImportadorCatalogo({
         <button type="button" onClick={descargarPlantilla} className="mt-3 inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-indigo-600 hover:text-indigo-700">
           <Download size={14} /> Descargar plantilla de ejemplo (.csv)
         </button>
+
+        <div className="mt-4 max-w-xs">
+          <label className="dt-label" htmlFor="fecha-saldo">Fecha del saldo inicial</label>
+          <input
+            id="fecha-saldo" type="date" className="dt-input"
+            min={limitesFecha.min} max={limitesFecha.max}
+            value={fechaSaldo}
+            disabled={importando}
+            onChange={(e) => setFechaSaldo(e.target.value)}
+          />
+          <p className="mt-1 text-[12px] text-pizarra-400">Fecha con la que el saldo inicial queda en el kardex. Por defecto, hoy.</p>
+        </div>
 
         <div className="costura my-4" />
 
